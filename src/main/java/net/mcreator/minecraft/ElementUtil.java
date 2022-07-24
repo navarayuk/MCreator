@@ -20,6 +20,8 @@ package net.mcreator.minecraft;
 
 import net.mcreator.element.BaseType;
 import net.mcreator.element.ModElementType;
+import net.mcreator.element.parts.MItemBlock;
+import net.mcreator.element.types.VillagerProfession;
 import net.mcreator.workspace.Workspace;
 import net.mcreator.workspace.elements.ModElement;
 import net.mcreator.workspace.elements.SoundElement;
@@ -193,8 +195,30 @@ public class ElementUtil {
 		return retval;
 	}
 
-	public static List<DataListEntry> loadAllVillagerProfessions() {
-		return DataListLoader.loadDataList("villagerprofessions");
+	public static List<DataListEntry> loadAllVillagerProfessions(Workspace workspace) {
+		List<DataListEntry> retval = getCustomElementsOfType(workspace, ModElementType.VILLAGERPROFESSION);
+		retval.addAll(
+				DataListLoader.loadDataList("villagerprofessions").stream().filter(typeMatches("profession")).toList());
+		return retval;
+	}
+
+	public static List<MItemBlock> loadAllPointOfInterest(Workspace workspace) {
+		List<MItemBlock> elements = new ArrayList<>();
+		workspace.getModElements().stream().filter(element -> element.getType() == ModElementType.VILLAGERPROFESSION)
+				.forEach(modElement -> elements.add(
+						((VillagerProfession) modElement.getGeneratableElement()).pointOfInterest));
+		/*
+		===NEW===
+		elements.addAll(DataListLoader.loadDataList("villagerprofessions").stream()
+				.filter(e -> e.isSupportedInWorkspace(workspace)).filter(typeMatches("poi"))
+				.map(e -> (MItemBlock) e)
+				.toList());
+		===OLD===
+		elements.addAll(DataListLoader.loadDataList("villagerprofessions").stream()
+				.filter(e -> e.isSupportedInWorkspace(workspace)).filter(typeMatches("poi")).map(e -> (MCItem) e)
+				.toList());
+		 */
+		return elements;
 	}
 
 	public static List<DataListEntry> getAllBooleanGameRules(Workspace workspace) {
