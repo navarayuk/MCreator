@@ -20,6 +20,7 @@ package net.mcreator.element.parts.gui;
 
 import com.google.gson.*;
 import com.google.gson.annotations.JsonAdapter;
+import net.mcreator.element.parts.procedure.RetvalProcedure;
 import net.mcreator.ui.wysiwyg.WYSIWYGEditor;
 import net.mcreator.workspace.Workspace;
 
@@ -33,35 +34,44 @@ import java.util.stream.Collectors;
 
 @JsonAdapter(GUIComponent.GSONAdapter.class) public abstract class GUIComponent implements Comparable<GUIComponent> {
 
-	public String name;
 	public int x;
 	public int y;
 
 	public transient UUID uuid;
 
-	private static transient final Map<String, Class<? extends GUIComponent>> typeMappings = new HashMap<>() {{
-		put("button", Button.class);
-		put("image", Image.class);
-		put("inputslot", InputSlot.class);
-		put("outputslot", OutputSlot.class);
-		put("label", Label.class);
-		put("textfield", TextField.class);
-		put("checkbox", Checkbox.class);
+	private static final Map<String, Class<? extends GUIComponent>> typeMappings = new HashMap<>() {{
+		put("entitymodel", EntityModel.class); //weight -10
+		put("textfield", TextField.class); // weight 0
+		put("label", Label.class); // weight 10
+		put("checkbox", Checkbox.class); //weight 20
+		put("imagebutton", ImageButton.class); //weight 25
+		put("button", Button.class);// weight 30
+		put("image", Image.class);// weight 40
+		put("inputslot", InputSlot.class); // weight 50
+		put("outputslot", OutputSlot.class); // weight 50
 	}};
 
-	private static transient final Map<Class<? extends GUIComponent>, String> typeMappingsReverse = typeMappings.entrySet()
+	private static final Map<Class<? extends GUIComponent>, String> typeMappingsReverse = typeMappings.entrySet()
 			.stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
 
 	GUIComponent() {
 		uuid = UUID.randomUUID();
 	}
 
-	GUIComponent(String name, int x, int y) {
+	GUIComponent(int x, int y) {
 		this();
-		this.name = name;
 		this.x = x;
 		this.y = y;
 	}
+
+	/**
+	 * Returns the name of the component. Name should be Java and registry name compatible.
+	 * <p>
+	 * The name should be unique for the components that need it.
+	 *
+	 * @return Component name
+	 */
+	public abstract String getName();
 
 	public abstract void paintComponent(int cx, int cy, WYSIWYGEditor wysiwygEditor, Graphics2D g);
 
@@ -69,7 +79,16 @@ import java.util.stream.Collectors;
 
 	public abstract int getHeight(Workspace workspace);
 
+	/**
+	 * Returns the priority for when this component should be drawn in the UI, to represent how Minecraft draws components in the game.
+	 *
+	 * @return The priority of the component (lower means it will be rendered closer to the screen and higher means it will "sink" more behind other components)
+	 */
 	public abstract int getWeight();
+
+	public boolean isSizeKnown() {
+		return true;
+	}
 
 	public final int getX() {
 		return x;
@@ -92,21 +111,32 @@ import java.util.stream.Collectors;
 	}
 
 	@Override public String toString() {
-		return name;
+		return getName();
 	}
 
 	public static class GSONAdapter implements JsonSerializer<GUIComponent>, JsonDeserializer<GUIComponent> {
 
-		private static final Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().setLenient()
-				.create();
+		private static final Gson gson;
+
+		static {
+			GsonBuilder gsonBuilder = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().setLenient();
+
+			RetvalProcedure.GSON_ADAPTERS.forEach(gsonBuilder::registerTypeAdapter);
+
+			gson = gsonBuilder.create();
+		}
 
 		@Override
 		public GUIComponent deserialize(JsonElement jsonElement, Type type,
 				JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
 			String elementType = jsonElement.getAsJsonObject().get("type").getAsString();
 
+			Class<? extends GUIComponent> typeMapping = typeMappings.get(elementType);
+			if (typeMapping == null)
+				typeMapping = Unknown.class; // fallback to Unknown (e.g. plugin component that no longer exists)
+
 			GUIComponent component = jsonDeserializationContext.deserialize(jsonElement.getAsJsonObject().get("data"),
-					typeMappings.get(elementType));
+					typeMapping);
 			component.uuid = UUID.randomUUID(); // init UUID for deserialized component
 			return component;
 		}
@@ -115,11 +145,39 @@ import java.util.stream.Collectors;
 		public JsonElement serialize(GUIComponent element, Type type,
 				JsonSerializationContext jsonSerializationContext) {
 			JsonObject root = new JsonObject();
-			root.add("type", new JsonPrimitive(typeMappingsReverse.get(element.getClass())));
+
+			String typeMapping = typeMappingsReverse.get(element.getClass());
+			if (typeMapping == null)
+				typeMapping = "unknown";
+
+			root.add("type", new JsonPrimitive(typeMapping));
 			root.add("data", gson.toJsonTree(element));
 			return root;
 		}
 
+	}
+
+	public static final class Unknown extends GUIComponent {
+
+		@Override public String getName() {
+			return "unknown_element";
+		}
+
+		@Override public void paintComponent(int cx, int cy, WYSIWYGEditor wysiwygEditor, Graphics2D g) {
+
+		}
+
+		@Override public int getWidth(Workspace workspace) {
+			return 0;
+		}
+
+		@Override public int getHeight(Workspace workspace) {
+			return 0;
+		}
+
+		@Override public int getWeight() {
+			return 0;
+		}
 	}
 
 }

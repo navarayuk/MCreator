@@ -17,24 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * MCreator (https://mcreator.net/)
- * Copyright (C) 2020 Pylo and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package net.mcreator.integration.ui;
 
 import net.mcreator.element.GeneratableElement;
@@ -65,10 +47,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -83,9 +62,6 @@ public class ModElementUITest {
 	@BeforeAll public static void initTest() throws IOException {
 		System.setProperty("log_directory", System.getProperty("java.io.tmpdir"));
 		LOG = LogManager.getLogger("Mod Element Test");
-
-		// disable webview to avoid issues in headless test environments
-		BlocklyPanel.DISABLE_WEBVIEW = true;
 
 		TestSetup.setupIntegrationTestEnvironment();
 
@@ -110,7 +86,7 @@ public class ModElementUITest {
 		TestWorkspaceDataProvider.fillWorkspaceWithTestData(workspace);
 
 		// generate some "dummy" procedures for dropdowns to work
-		for (int i = 1; i <= 14; i++) {
+		for (int i = 1; i <= 15; i++) {
 			workspace.addModElement(
 					new ModElement(workspace, "procedure" + i, ModElementType.PROCEDURE).putMetadata("dependencies",
 							new ArrayList<String>()));
@@ -122,10 +98,16 @@ public class ModElementUITest {
 							new ArrayList<String>()).putMetadata("return_type", "LOGIC"));
 		}
 
-		for (int i = 1; i <= 1; i++) {
+		for (int i = 1; i <= 2; i++) {
 			workspace.addModElement(
 					new ModElement(workspace, "number" + i, ModElementType.PROCEDURE).putMetadata("dependencies",
 							new ArrayList<String>()).putMetadata("return_type", "NUMBER"));
+		}
+
+		for (int i = 1; i <= 2; i++) {
+			workspace.addModElement(
+					new ModElement(workspace, "string" + i, ModElementType.PROCEDURE).putMetadata("dependencies",
+							new ArrayList<String>()).putMetadata("return_type", "STRING"));
 		}
 
 		for (int i = 1; i <= 2; i++) {
@@ -140,8 +122,14 @@ public class ModElementUITest {
 							"dependencies", new ArrayList<String>()).putMetadata("return_type", "ACTIONRESULTTYPE"));
 		}
 
+		for (int i = 1; i <= 1; i++) {
+			workspace.addModElement(
+					new ModElement(workspace, "entity" + i, ModElementType.PROCEDURE).putMetadata("dependencies",
+							new ArrayList<String>()).putMetadata("return_type", "ENTITY"));
+		}
+
 		// reduce autosave interval for tests
-		PreferencesManager.PREFERENCES.backups.workspaceAutosaveInterval = 2000;
+		PreferencesManager.PREFERENCES.backups.workspaceAutosaveInterval.set(2000);
 
 		LOG.info("Test workspace folder: " + workspace.getWorkspaceFolder());
 	}
@@ -151,7 +139,7 @@ public class ModElementUITest {
 		Random random = new Random(rgenseed);
 		LOG.info("Random number generator seed: " + rgenseed);
 
-		PreferencesManager.PREFERENCES.ui.language = L10N.DEFAULT_LOCALE;
+		PreferencesManager.PREFERENCES.ui.language.set(L10N.DEFAULT_LOCALE);
 		L10N.initTranslations();
 
 		// test mod elements using default (en) translations
@@ -164,22 +152,23 @@ public class ModElementUITest {
 		Random random = new Random(rgenseed);
 		LOG.info("Random number generator seed: " + rgenseed);
 
-		PreferencesManager.PREFERENCES.ui.language = L10N.getSupportedLocales().stream()
+		PreferencesManager.PREFERENCES.ui.language.set(L10N.getSupportedLocales().stream()
 				.filter(locale -> locale != L10N.DEFAULT_LOCALE)
-				.max(Comparator.comparingInt(L10N::getUITextsLocaleSupport)).orElse(null);
+				.max(Comparator.comparingInt(L10N::getUITextsLocaleSupport)).orElse(null));
 		L10N.initTranslations();
 
-		LOG.info("Testing mod element GUI for locale " + PreferencesManager.PREFERENCES.ui.language);
+		LOG.info("Testing mod element GUI for locale " + PreferencesManager.PREFERENCES.ui.language.get());
 
 		testModElementLoading(random);
 	}
 
 	private void testModElementLoading(Random random)
-			throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException {
+			throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException,
+			InterruptedException {
 		for (ModElementType<?> modElementType : ModElementTypeLoader.REGISTRY) {
 
 			List<GeneratableElement> generatableElements = TestWorkspaceDataProvider.getModElementExamplesFor(workspace,
-					modElementType, random);
+					modElementType, true, random);
 
 			LOG.info("Testing mod element type UI " + modElementType.getReadableName() + " with "
 					+ generatableElements.size() + " variants");
@@ -204,6 +193,8 @@ public class ModElementUITest {
 
 				ModElementGUI<?> modElementGUI = modElementType.getModElementGUI(mcreator, modElement, false);
 
+				modElementGUI.showView();
+
 				Field field = modElementGUI.getClass().getSuperclass().getDeclaredField("editingMode");
 				field.setAccessible(true);
 				field.set(modElementGUI, true);
@@ -213,6 +204,12 @@ public class ModElementUITest {
 						.getDeclaredMethod("openInEditingMode", GeneratableElement.class);
 				method.setAccessible(true);
 				method.invoke(modElementGUI, generatableElement);
+
+				if (Arrays.stream(modElementGUI.getClass().getDeclaredFields())
+						.anyMatch(f -> f.getType() == BlocklyPanel.class)) {
+					// If ModElementGUI<?> contains BlocklyPanel, give it time to fully load
+					Thread.sleep(3500);
+				}
 
 				// test if data remains the same after reloading the data lists
 				modElementGUI.reloadDataLists();

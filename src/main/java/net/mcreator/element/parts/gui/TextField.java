@@ -23,17 +23,25 @@ import net.mcreator.ui.wysiwyg.WYSIWYGEditor;
 
 import java.awt.*;
 
-public class TextField extends SizedComponent implements IMachineNamedComponent {
+public class TextField extends SizedComponent {
 
 	public String placeholder;
 
+	public String name;
+
 	public TextField(String name, int x, int y, int width, int height, String placeholder) {
-		super(name, x, y, width, height);
+		super(x, y, width, height);
 		this.placeholder = placeholder;
+
+		this.name = name;
+	}
+
+	@Override public String getName() {
+		return name;
 	}
 
 	@Override public int getWeight() {
-		return 1;
+		return 0;
 	}
 
 	@Override public void paintComponent(int cx, int cy, WYSIWYGEditor wysiwygEditor, Graphics2D g) {

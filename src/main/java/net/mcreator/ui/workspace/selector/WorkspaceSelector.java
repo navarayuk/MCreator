@@ -16,24 +16,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * MCreator (https://mcreator.net/)
- * Copyright (C) 2020 Pylo and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package net.mcreator.ui.workspace.selector;
 
 import com.google.gson.Gson;
@@ -91,8 +73,11 @@ public final class WorkspaceSelector extends JFrame implements DropTargetListene
 	private final WorkspaceOpenListener workspaceOpenListener;
 	private RecentWorkspaces recentWorkspaces = new RecentWorkspaces();
 
+	@Nullable private final MCreatorApplication application;
+
 	public WorkspaceSelector(@Nullable MCreatorApplication application, WorkspaceOpenListener workspaceOpenListener) {
 		this.workspaceOpenListener = workspaceOpenListener;
+		this.application = application;
 
 		reloadTitle();
 		setIconImage(UIRES.getBuiltIn("icon").getImage());
@@ -150,8 +135,9 @@ public final class WorkspaceSelector extends JFrame implements DropTargetListene
 								L10N.t("dialog.workspace_selector.clone.setup_failed", ex.getMessage()),
 								L10N.t("dialog.workspace_selector.clone.setup_failed.title"),
 								JOptionPane.ERROR_MESSAGE);
+					} finally {
+						setCursor(Cursor.getDefaultCursor());
 					}
-					setCursor(Cursor.getDefaultCursor());
 				}
 			}
 		}, actions);
@@ -366,6 +352,37 @@ public final class WorkspaceSelector extends JFrame implements DropTargetListene
 					}
 				}
 			});
+			recentsList.addKeyListener(new KeyAdapter() {
+				@Override public void keyPressed(KeyEvent e) {
+					if (e.getKeyCode() == KeyEvent.VK_DELETE) {
+						Object[] options = { L10N.t("dialog.workspace_selector.delete_workspace.recent_list"),
+								L10N.t("dialog.workspace_selector.delete_workspace.workspace"),
+								L10N.t("common.cancel") };
+						int n = JOptionPane.showOptionDialog(WorkspaceSelector.this,
+								L10N.t("dialog.workspace_selector.delete_workspace.message",
+										recentsList.getSelectedValue().getName()),
+								L10N.t("dialog.workspace_selector.delete_workspace.title"),
+								JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options,
+								options[0]);
+
+						if (n == 0) {
+							removeRecentWorkspace(recentsList.getSelectedValue());
+							reloadRecents();
+						} else if (n == 1) {
+							int m = JOptionPane.showConfirmDialog(WorkspaceSelector.this,
+									L10N.t("dialog.workspace_selector.delete_workspace.confirmation",
+											recentsList.getSelectedValue().getName()), L10N.t("common.confirmation"),
+									JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+							if (m == JOptionPane.YES_OPTION) {
+								FileIO.deleteDir(recentsList.getSelectedValue().getPath().getParentFile());
+								reloadRecents();
+							}
+						}
+					} else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+						workspaceOpenListener.workspaceOpened(recentsList.getSelectedValue().getPath());
+					}
+				}
+			});
 			recentsList.setCellRenderer(new RecentWorkspacesRenderer());
 			JScrollPane scrollPane = new JScrollPane(recentsList);
 			scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -466,7 +483,7 @@ public final class WorkspaceSelector extends JFrame implements DropTargetListene
 		if (!Launcher.version.isSnapshot()) {
 			soim = new ImagePanel(ImageUtils.darken(ImageUtils.toBufferedImage(UIRES.getBuiltIn("splash").getImage())));
 			((ImagePanel) soim).setFitToWidth(true);
-			((ImagePanel) soim).setOffsetY(-50);
+			((ImagePanel) soim).setOffsetY(-270);
 		} else {
 			soim = new JPanel();
 			soim.setBackground((Color) UIManager.get("MCreatorLAF.DARK_ACCENT"));
@@ -487,4 +504,7 @@ public final class WorkspaceSelector extends JFrame implements DropTargetListene
 		return recentWorkspaces;
 	}
 
+	@Nullable public MCreatorApplication getApplication() {
+		return application;
+	}
 }

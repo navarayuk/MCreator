@@ -61,25 +61,16 @@ import java.util.Locale;
 
 	public double rainingPossibility;
 	public double temperature;
-	public double baseHeight;
-	public double heightVariation;
 
 	public boolean spawnBiome;
+	public boolean spawnInCaves;
 	public boolean spawnBiomeNether;
 
-	public boolean spawnInCaves;
-
-	public int biomeWeight;
-
-	public int grassPerChunk;
-	public int seagrassPerChunk;
-	public int flowersPerChunk;
-	public int mushroomsPerChunk;
-	public int bigMushroomsChunk;
-	public int sandPatchesPerChunk;
-	public int gravelPatchesPerChunk;
-	public int reedsPerChunk;
-	public int cactiPerChunk;
+	public ClimatePoint genTemperature;
+	public ClimatePoint genHumidity;
+	public ClimatePoint genContinentalness;
+	public ClimatePoint genErosion;
+	public ClimatePoint genWeirdness;
 
 	public int treesPerChunk;
 	public String vanillaTreeType;
@@ -89,6 +80,8 @@ import java.util.Locale;
 	public MItemBlock treeBranch;
 	public MItemBlock treeVines;
 	public MItemBlock treeFruits;
+
+	public List<String> defaultFeatures;
 
 	public boolean spawnStronghold;
 	public boolean spawnMineshaft;
@@ -110,8 +103,6 @@ import java.util.Locale;
 	public boolean spawnBastionRemnant;
 	public boolean spawnEndCity;
 	public String spawnRuinedPortal;
-
-	public List<String> defaultFeatures;
 
 	public List<SpawnEntry> spawnEntries;
 
@@ -139,12 +130,16 @@ import java.util.Locale;
 		defaultFeatures = new ArrayList<>();
 	}
 
+	public boolean hasTrees() {
+		return treesPerChunk > 0;
+	}
+
 	public boolean hasFruits() {
-		return !treeFruits.isEmpty();
+		return hasTrees() && treeType == TREES_CUSTOM && treeFruits != null && !treeFruits.isEmpty();
 	}
 
 	public boolean hasVines() {
-		return !treeVines.isEmpty();
+		return hasTrees() && treeType == TREES_CUSTOM && treeVines != null && !treeVines.isEmpty();
 	}
 
 	public boolean hasStructure(String structureType) {
@@ -204,6 +199,17 @@ import java.util.Locale;
 		public int weight;
 		public String spawnType;
 
+	}
+
+	public static class ClimatePoint {
+
+		public double min;
+		public double max;
+
+		public ClimatePoint(double min, double max) {
+			this.min = min;
+			this.max = max;
+		}
 	}
 
 }

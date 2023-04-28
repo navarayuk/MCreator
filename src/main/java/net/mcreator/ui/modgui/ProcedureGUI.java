@@ -22,8 +22,8 @@ import net.mcreator.blockly.BlocklyCompileNote;
 import net.mcreator.blockly.data.*;
 import net.mcreator.blockly.java.BlocklyToProcedure;
 import net.mcreator.element.GeneratableElement;
-import net.mcreator.element.parts.Procedure;
 import net.mcreator.element.parts.gui.GUIComponent;
+import net.mcreator.element.parts.procedure.Procedure;
 import net.mcreator.element.types.Command;
 import net.mcreator.element.types.GUI;
 import net.mcreator.generator.blockly.BlocklyBlockCodeGenerator;
@@ -103,14 +103,14 @@ public class ProcedureGUI extends ModElementGUI<net.mcreator.element.types.Proce
 		super.finalizeGUI(false);
 	}
 
-	private void regenerateProcedure() {
+	private synchronized void regenerateProcedure() {
 		BlocklyBlockCodeGenerator blocklyBlockCodeGenerator = new BlocklyBlockCodeGenerator(externalBlocks,
-				mcreator.getGeneratorStats().getGeneratorProcedures());
+				mcreator.getGeneratorStats().getBlocklyBlocks(BlocklyEditorType.PROCEDURE));
 		BlocklyToProcedure blocklyToJava;
 
 		try {
-			blocklyToJava = new BlocklyToProcedure(mcreator.getWorkspace(), blocklyPanel.getXML(), null,
-					new ProceduralBlockCodeGenerator(blocklyBlockCodeGenerator),
+			blocklyToJava = new BlocklyToProcedure(mcreator.getWorkspace(), this.modElement, blocklyPanel.getXML(),
+					null, new ProceduralBlockCodeGenerator(blocklyBlockCodeGenerator),
 					new OutputBlockCodeGenerator(blocklyBlockCodeGenerator));
 		} catch (TemplateGeneratorException e) {
 			return;
@@ -220,7 +220,7 @@ public class ProcedureGUI extends ModElementGUI<net.mcreator.element.types.Proce
 						sideTriggerLabel.setIcon(UIRES.get("16px.server"));
 					}
 
-					if (!mcreator.getGeneratorStats().getGeneratorTriggers().contains(trigger.getID())) {
+					if (!mcreator.getGeneratorStats().getProcedureTriggers().contains(trigger.getID())) {
 						compileNotesArrayList.add(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
 								L10N.t("elementgui.procedure.global_trigger_unsupported")));
 					}
@@ -562,12 +562,12 @@ public class ProcedureGUI extends ModElementGUI<net.mcreator.element.types.Proce
 		pane5.add("East", PanelUtils.centerAndSouthElement(eastPan, returnType));
 		pane5.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
 
-		externalBlocks = BlocklyLoader.INSTANCE.getProcedureBlockLoader().getDefinedBlocks();
+		externalBlocks = BlocklyLoader.INSTANCE.getBlockLoader(BlocklyEditorType.PROCEDURE).getDefinedBlocks();
 
-		blocklyPanel = new BlocklyPanel(mcreator);
+		blocklyPanel = new BlocklyPanel(mcreator, BlocklyEditorType.PROCEDURE);
 		blocklyPanel.addTaskToRunAfterLoaded(() -> {
-			BlocklyLoader.INSTANCE.getProcedureBlockLoader()
-					.loadBlocksAndCategoriesInPanel(blocklyPanel, ExternalBlockLoader.ToolboxType.PROCEDURE);
+			BlocklyLoader.INSTANCE.getBlockLoader(BlocklyEditorType.PROCEDURE)
+					.loadBlocksAndCategoriesInPanel(blocklyPanel, ToolboxType.PROCEDURE);
 
 			BlocklyLoader.INSTANCE.getExternalTriggerLoader().getExternalTrigers()
 					.forEach(blocklyPanel.getJSBridge()::addExternalTrigger);
@@ -576,8 +576,7 @@ public class ProcedureGUI extends ModElementGUI<net.mcreator.element.types.Proce
 			}
 			blocklyPanel.getJSBridge().setJavaScriptEventListener(() -> new Thread(this::regenerateProcedure).start());
 			if (!isEditingMode()) {
-				blocklyPanel.setXML(
-						"<xml><block type=\"event_trigger\" deletable=\"false\" x=\"40\" y=\"40\"></block></xml>");
+				blocklyPanel.setXML(net.mcreator.element.types.Procedure.XML_BASE);
 			}
 		});
 

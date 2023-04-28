@@ -23,9 +23,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import net.mcreator.element.GeneratableElement;
 import net.mcreator.element.ModElementType;
-import net.mcreator.element.parts.NumberProcedure;
+import net.mcreator.element.parts.procedure.RetvalProcedure;
 import net.mcreator.element.types.CustomElement;
-import net.mcreator.generator.Generator;
 import net.mcreator.generator.GeneratorTemplate;
 import net.mcreator.io.FileIO;
 import net.mcreator.workspace.Workspace;
@@ -33,6 +32,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * ModElementManager is not thread safe
  */
-public class ModElementManager {
+public final class ModElementManager {
 
 	private static final Logger LOG = LogManager.getLogger("ModElementManager");
 
@@ -56,13 +56,19 @@ public class ModElementManager {
 
 	@Nonnull private final Workspace workspace;
 
+	@Nullable private ModElement modElementInConversion = null;
+
 	public ModElementManager(@Nonnull Workspace workspace) {
 		this.workspace = workspace;
 
 		this.gsonAdapter = new GeneratableElement.GSONAdapter(this.workspace);
-		this.gson = new GsonBuilder().registerTypeAdapter(NumberProcedure.class, new NumberProcedure.GSONAdapter())
-				.registerTypeHierarchyAdapter(GeneratableElement.class, this.gsonAdapter).disableHtmlEscaping()
-				.setPrettyPrinting().setLenient().create();
+
+		GsonBuilder gsonBuilder = new GsonBuilder().registerTypeHierarchyAdapter(GeneratableElement.class,
+				this.gsonAdapter).disableHtmlEscaping().setPrettyPrinting().setLenient();
+
+		RetvalProcedure.GSON_ADAPTERS.forEach(gsonBuilder::registerTypeAdapter);
+
+		this.gson = gsonBuilder.create();
 	}
 
 	public void invalidateCache() {
@@ -77,7 +83,23 @@ public class ModElementManager {
 						element.getModElement().getName() + ".mod.json"));
 	}
 
+	/**
+	 * Mod element passed here will be used to prevent circular reference when converting the generatable element.
+	 * Make sure to call this method again with null argument after the conversion is done or this ME will not be
+	 * loadable anymore in the current session.
+	 *
+	 * @param modElementInConversion ME being converted or null if conversion is complete
+	 */
+	public void setModElementInConversion(@Nullable ModElement modElementInConversion) {
+		this.modElementInConversion = modElementInConversion;
+	}
+
 	GeneratableElement loadGeneratableElement(ModElement element) {
+		// To prevent circular reference (and thus stack overflow), we return Unknown GE if we are loading the
+		// mod element that is being converted as otherwise this will try to start the conversion again
+		if (element.equals(modElementInConversion))
+			return new GeneratableElement.Unknown(element);
+
 		if (element.getType() == ModElementType.CODE) {
 			return new CustomElement(element);
 		}
@@ -93,7 +115,7 @@ public class ModElementManager {
 		String importJSON = FileIO.readFileToString(genFile);
 
 		GeneratableElement generatableElement = fromJSONtoGeneratableElement(importJSON, element);
-		if (generatableElement != null) {
+		if (generatableElement != null && element.getType() != ModElementType.UNKNOWN) {
 			if (generatableElement.wasConversionApplied())
 				storeModElement(generatableElement);
 
@@ -112,7 +134,8 @@ public class ModElementManager {
 			this.gsonAdapter.setLastModElement(modElement);
 			return gson.fromJson(json, GeneratableElement.class);
 		} catch (JsonSyntaxException e) {
-			LOG.warn("Failed to load generatable element from JSON. This can lead to errors further down the road!", e);
+			LOG.warn("Failed to load generatable element " + modElement.getName()
+					+ " from JSON. This can lead to errors further down the road!", e);
 			return null;
 		}
 	}
@@ -129,25 +152,14 @@ public class ModElementManager {
 	}
 
 	public boolean requiresElementGradleBuild(GeneratableElement generatableElement) {
-		Generator generator = workspace.getGenerator();
-		Map<?, ?> map = generator.getGeneratorConfiguration().getDefinitionsProvider()
-				.getModElementDefinition(generatableElement.getModElement().getType());
+		List<GeneratorTemplate> templates = new ArrayList<>(workspace.getGenerator()
+				.getGlobalTemplatesListForModElementType(generatableElement.getModElement().getType(), false,
+						new AtomicInteger()));
 
-		List<GeneratorTemplate> templates = new ArrayList<>();
-
-		if (map != null && (!map.containsKey("global_templates_trigger_build") || !map.get(
-				"global_templates_trigger_build").toString().equals("false")))
-			templates.addAll(
-					generator.getModElementGlobalTemplatesList(generatableElement.getModElement().getType(), false,
-							new AtomicInteger()));
-
-		List<GeneratorTemplate> elementTemplates = generator.getModElementGeneratorTemplatesList(
-				generatableElement.getModElement());
-		if (elementTemplates != null)
-			templates.addAll(elementTemplates);
+		templates.addAll(workspace.getGenerator().getModElementGeneratorTemplatesList(generatableElement));
 
 		for (GeneratorTemplate template : templates) {
-			String writer = (String) ((Map<?, ?>) template.getTemplateData()).get("writer");
+			String writer = (String) template.getTemplateDefinition().get("writer");
 			if (writer == null || writer.equals("java"))
 				return true;
 		}
@@ -169,7 +181,7 @@ public class ModElementManager {
 						new File(workspace.getFolderManager().getModElementPicturesCacheDir(),
 								element.getModElement().getName() + ".png"));
 		} catch (Exception e1) {
-			LOG.warn("Failed to generate mod element picture for " + element.getModElement().getName());
+			LOG.warn("Failed to generate mod element picture for " + element.getModElement().getName(), e1);
 		}
 	}
 

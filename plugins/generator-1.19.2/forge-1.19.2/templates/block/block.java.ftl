@@ -33,7 +33,6 @@
 <#include "../mcitems.ftl">
 <#include "../procedures.java.ftl">
 <#include "../triggers.java.ftl">
-<#include "../particles.java.ftl">
 
 package ${package}.block;
 
@@ -41,6 +40,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.block.state.BlockBehaviour.Properties;
 import net.minecraft.world.level.material.Material;
 
+<#compress>
 public class ${name}Block extends
 	<#if data.hasGravity>
 		FallingBlock
@@ -52,10 +52,18 @@ public class ${name}Block extends
 		Block
 	</#if>
 
-	<#if data.isWaterloggable || data.hasInventory>
-	implements
-		<#if data.isWaterloggable>SimpleWaterloggedBlock</#if>
-		<#if data.hasInventory><#if data.isWaterloggable>,</#if>EntityBlock</#if>
+	<#assign interfaces = []>
+	<#if data.isWaterloggable>
+		<#assign interfaces += ["SimpleWaterloggedBlock"]>
+	</#if>
+	<#if data.hasInventory>
+		<#assign interfaces += ["EntityBlock"]>
+	</#if>
+	<#if data.isBonemealable>
+		<#assign interfaces += ["BonemealableBlock"]>
+	</#if>
+	<#if interfaces?size gt 0>
+		implements ${interfaces?join(",")}
 	</#if>
 {
 
@@ -80,11 +88,13 @@ public class ${name}Block extends
 			BlockBehaviour.Properties.of(Material.${data.material})
 		</#if>
 		<#if data.isCustomSoundType>
-			.sound(new ForgeSoundType(1.0f, 1.0f, () -> new SoundEvent(new ResourceLocation("${data.breakSound}")),
-			() -> new SoundEvent(new ResourceLocation("${data.stepSound}")),
-			() -> new SoundEvent(new ResourceLocation("${data.placeSound}")),
-			() -> new SoundEvent(new ResourceLocation("${data.hitSound}")),
-			() -> new SoundEvent(new ResourceLocation("${data.fallSound}"))))
+			.sound(new ForgeSoundType(1.0f, 1.0f,
+				() -> ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("${data.breakSound}")),
+				() -> ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("${data.stepSound}")),
+				() -> ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("${data.placeSound}")),
+				() -> ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("${data.hitSound}")),
+				() -> ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("${data.fallSound}")))
+			)
 		<#else>
 			.sound(SoundType.${data.soundOnStep})
 		</#if>
@@ -219,6 +229,12 @@ public class ${name}Block extends
 	<#if !data.blockBase?has_content || data.blockBase == "Leaves" || data.lightOpacity != 15>
 	@Override public int getLightBlock(BlockState state, BlockGetter worldIn, BlockPos pos) {
 		return ${data.lightOpacity};
+	}
+	</#if>
+
+	<#if data.hasTransparency && !data.blockBase?has_content>
+	@Override public VoxelShape getVisualShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+		return Shapes.empty();
 	}
 	</#if>
 
@@ -442,7 +458,12 @@ public class ${name}Block extends
 
 	<#if data.requiresCorrectTool>
 	@Override public boolean canHarvestBlock(BlockState state, BlockGetter world, BlockPos pos, Player player) {
-		if(player.getInventory().getSelected().getItem() instanceof TieredItem tieredItem)
+		if(player.getInventory().getSelected().getItem() instanceof
+				<#if data.destroyTool == "pickaxe">PickaxeItem
+				<#elseif data.destroyTool == "axe">AxeItem
+				<#elseif data.destroyTool == "shovel">ShovelItem
+				<#elseif data.destroyTool == "hoe">HoeItem
+				<#else>TieredItem</#if> tieredItem)
 			return tieredItem.getTier().getLevel() >= ${data.breakHarvestLevel};
 		return false;
 	}
@@ -515,7 +536,7 @@ public class ${name}Block extends
 	}
 	</#if>
 
-	<#if hasProcedure(data.onRandomUpdateEvent) || data.spawnParticles>
+	<#if hasProcedure(data.onRandomUpdateEvent)>
 	@OnlyIn(Dist.CLIENT) @Override
 	public void animateTick(BlockState blockstate, Level world, BlockPos pos, RandomSource random) {
 		super.animateTick(blockstate, world, pos, random);
@@ -523,12 +544,6 @@ public class ${name}Block extends
 		int x = pos.getX();
 		int y = pos.getY();
 		int z = pos.getZ();
-		<#if data.spawnParticles>
-			<#if hasProcedure(data.particleCondition)>
-			if(<@procedureOBJToConditionCode data.particleCondition/>)
-			</#if>
-	        <@particles data.particleSpawningShape data.particleToSpawn data.particleSpawningRadious data.particleAmount/>
-	    </#if>
 		<@procedureOBJToCode data.onRandomUpdateEvent/>
 	}
 	</#if>
@@ -585,6 +600,10 @@ public class ${name}Block extends
 		return result;
 		</#if>
 	}
+	</#if>
+
+	<#if data.isBonemealable>
+	<@bonemealEvents data.isBonemealTargetCondition, data.bonemealSuccessCondition, data.onBonemealSuccess/>
 	</#if>
 
 	<#if data.hasInventory>
@@ -687,4 +706,5 @@ public class ${name}Block extends
 	</#if>
 
 }
+</#compress>
 <#-- @formatter:on -->

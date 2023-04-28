@@ -25,9 +25,11 @@ import net.mcreator.blockly.java.ProcedureCodeOptimizer;
 import net.mcreator.generator.IGeneratorProvider;
 import net.mcreator.generator.template.TemplateGenerator;
 import net.mcreator.generator.template.TemplateGeneratorException;
+import net.mcreator.ui.blockly.BlocklyEditorType;
 import net.mcreator.ui.init.L10N;
 import net.mcreator.util.XMLUtil;
 import net.mcreator.workspace.Workspace;
+import net.mcreator.workspace.elements.ModElement;
 import org.w3c.dom.Element;
 
 import javax.annotation.Nonnull;
@@ -39,25 +41,37 @@ import java.util.stream.Collectors;
 public abstract class BlocklyToCode implements IGeneratorProvider {
 
 	private final StringBuilder code;
-	private final List<BlocklyCompileNote> compile_notes;
+	private final List<BlocklyCompileNote> compileNotes;
 	private final Set<Dependency> dependencies;
+
+	private final ModElement parent;
 
 	@Nullable private final TemplateGenerator templateGenerator;
 	private final Workspace workspace;
 
 	protected List<IBlockGenerator> blockGenerators;
 
+	protected final BlocklyEditorType editorType;
+
 	protected String lastProceduralBlockType = null;
 
 	private final Stack<DependencyProviderInput> dependencyProviderInputStack = new Stack<>();
 
-	public BlocklyToCode(Workspace workspace, @Nullable TemplateGenerator templateGenerator,
-			IBlockGenerator... externalGenerators) {
+	/**
+	 * @param workspace          <p>The {@link Workspace} executing the code</p>
+	 * @param editorType         <p>Blockly editor type</p>
+	 * @param templateGenerator  <p>The folder location in each {@link net.mcreator.generator.Generator} containing the code template files<p>
+	 * @param externalGenerators <p>Define which block types (procedural and/or output) are supported inside this Blockly editor</p>
+	 */
+	public BlocklyToCode(Workspace workspace, ModElement parent, BlocklyEditorType editorType,
+			@Nullable TemplateGenerator templateGenerator, IBlockGenerator... externalGenerators) {
+		this.editorType = editorType;
 		this.templateGenerator = templateGenerator;
 		this.workspace = workspace;
+		this.parent = parent;
 
 		code = new StringBuilder();
-		compile_notes = new ArrayList<>();
+		compileNotes = new ArrayList<>();
 		dependencies = new HashSet<>();
 
 		blockGenerators = new ArrayList<>();
@@ -71,7 +85,15 @@ public abstract class BlocklyToCode implements IGeneratorProvider {
 	}
 
 	public final List<BlocklyCompileNote> getCompileNotes() {
-		return compile_notes;
+		return compileNotes;
+	}
+
+	public ModElement getParent() {
+		return parent;
+	}
+
+	public BlocklyEditorType getEditorType() {
+		return editorType;
 	}
 
 	public final List<Dependency> getDependencies() {
@@ -94,7 +116,7 @@ public abstract class BlocklyToCode implements IGeneratorProvider {
 	}
 
 	public final void addCompileNote(BlocklyCompileNote compileNote) {
-		compile_notes.add(compileNote);
+		compileNotes.add(compileNote);
 	}
 
 	public final void addDependency(Dependency dependency) {
@@ -138,22 +160,28 @@ public abstract class BlocklyToCode implements IGeneratorProvider {
 	public final void processBlockProcedure(List<Element> blocks) throws TemplateGeneratorException {
 		for (Element block : blocks) {
 			String type = block.getAttribute("type");
-			boolean generated = false;
-			for (IBlockGenerator generator : blockGenerators) {
-				if (generator.getBlockType() == IBlockGenerator.BlockType.PROCEDURAL && Arrays.asList(
-						generator.getSupportedBlocks()).contains(type)) {
-					generator.generateBlock(this, block);
 
-					lastProceduralBlockType = type; // update last block type generated
-
-					generated = true;
-					break;
-				}
-			}
-
-			if (!generated) {
+			if (block.getAttribute("disabled").equals("true")) { // Skip disabled blocks
 				addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
-						L10N.t("blockly.warnings.unknown_block_type.skip", type)));
+						L10N.t("blockly.warnings.disabled_block_type.skip", type)));
+			} else {
+				boolean generated = false;
+				for (IBlockGenerator generator : blockGenerators) {
+					if (generator.getBlockType() == IBlockGenerator.BlockType.PROCEDURAL && Arrays.asList(
+							generator.getSupportedBlocks()).contains(type)) {
+						generator.generateBlock(this, block);
+
+						lastProceduralBlockType = type; // update last block type generated
+
+						generated = true;
+						break;
+					}
+				}
+
+				if (!generated) {
+					addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
+							L10N.t("blockly.warnings.unknown_block_type.skip", type)));
+				}
 			}
 		}
 	}
@@ -165,20 +193,25 @@ public abstract class BlocklyToCode implements IGeneratorProvider {
 		Element block = conditionBlocks.get(0);
 		String type = block.getAttribute("type");
 
-		boolean generated = false;
-		for (IBlockGenerator generator : blockGenerators) {
-			if (generator.getBlockType() == IBlockGenerator.BlockType.OUTPUT && Arrays.asList(
-					generator.getSupportedBlocks()).contains(type)) {
-				generator.generateBlock(this, block);
-
-				generated = true;
-				break;
-			}
-		}
-
-		if (!generated) {
+		if (block.getAttribute("disabled").equals("true")) { // Add compile error if block is disabled
 			addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
-					L10N.t("blockly.warnings.unknown_block_type.remove", type)));
+					L10N.t("blockly.errors.disabled_block_type.remove", type)));
+		} else {
+			boolean generated = false;
+			for (IBlockGenerator generator : blockGenerators) {
+				if (generator.getBlockType() == IBlockGenerator.BlockType.OUTPUT && Arrays.asList(
+						generator.getSupportedBlocks()).contains(type)) {
+					generator.generateBlock(this, block);
+
+					generated = true;
+					break;
+				}
+			}
+
+			if (!generated) {
+				addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+						L10N.t("blockly.errors.unknown_block_type.remove", type)));
+			}
 		}
 	}
 
@@ -240,6 +273,17 @@ public abstract class BlocklyToCode implements IGeneratorProvider {
 	 */
 	public String directProcessOutputBlockWithoutParentheses(Element element) throws TemplateGeneratorException {
 		return ProcedureCodeOptimizer.removeParentheses(directProcessOutputBlock(this, element));
+	}
+
+	/**
+	 * Helper method to process an output block and cast to int when needed
+	 *
+	 * @param element The element to process
+	 * @throws TemplateGeneratorException If the template can't be generated
+	 */
+	public final void processOutputBlockToInt(Element element) throws TemplateGeneratorException {
+		String code = directProcessOutputBlock(this, element);
+		this.append(ProcedureCodeOptimizer.toInt(code));
 	}
 
 }

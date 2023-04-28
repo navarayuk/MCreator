@@ -21,9 +21,7 @@ package net.mcreator.generator.blockly;
 import net.mcreator.blockly.BlocklyCompileNote;
 import net.mcreator.blockly.BlocklyToCode;
 import net.mcreator.blockly.IBlockGenerator;
-import net.mcreator.blockly.data.Dependency;
-import net.mcreator.blockly.data.StatementInput;
-import net.mcreator.blockly.data.ToolboxBlock;
+import net.mcreator.blockly.data.*;
 import net.mcreator.generator.template.TemplateGenerator;
 import net.mcreator.generator.template.TemplateGeneratorException;
 import net.mcreator.ui.init.L10N;
@@ -35,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class BlocklyBlockCodeGenerator {
 
@@ -47,16 +46,16 @@ public class BlocklyBlockCodeGenerator {
 
 	private String templateExtension = "java";
 
-	@Nullable private Set<String> supportedBlocksGenerator;
+	private final Set<String> supportedBlocksGenerator;
 
-	public BlocklyBlockCodeGenerator(Map<String, ToolboxBlock> blocks, @Nullable Set<String> supportedBlocksGenerator) {
-		this(blocks, null, null);
-		this.supportedBlocksGenerator = supportedBlocksGenerator;
+	public BlocklyBlockCodeGenerator(Map<String, ToolboxBlock> blocks, Set<String> supportedBlocksGenerator) {
+		this(blocks, supportedBlocksGenerator, null, null);
 	}
 
-	public BlocklyBlockCodeGenerator(Map<String, ToolboxBlock> blocks, @Nullable TemplateGenerator templateGenerator,
-			@Nullable Map<String, Object> additionalData) {
+	public BlocklyBlockCodeGenerator(Map<String, ToolboxBlock> blocks, Set<String> supportedBlocksGenerator,
+			@Nullable TemplateGenerator templateGenerator, @Nullable Map<String, Object> additionalData) {
 		this.blocks = blocks;
+		this.supportedBlocksGenerator = supportedBlocksGenerator;
 		this.templateGenerator = templateGenerator;
 		this.additionalData = additionalData;
 	}
@@ -73,22 +72,6 @@ public class BlocklyBlockCodeGenerator {
 		if (toolboxBlock == null)
 			return;
 
-		if (supportedBlocksGenerator != null) {
-			if (toolboxBlock.type == IBlockGenerator.BlockType.PROCEDURAL) {
-				if (!supportedBlocksGenerator.contains(type)) {
-					master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
-							L10N.t("blockly.warnings.block_not_supported", type)));
-					return;
-				}
-			} else if (toolboxBlock.type == IBlockGenerator.BlockType.OUTPUT) {
-				if (!supportedBlocksGenerator.contains(type)) {
-					master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
-							L10N.t("blockly.errors.block_not_supported", type)));
-					return;
-				}
-			}
-		}
-
 		// check if the block does work inside statement blocks
 		if (toolboxBlock.error_in_statement_blocks && !master.getStatementInputsMatching(si -> true).isEmpty()) {
 			master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
@@ -101,6 +84,8 @@ public class BlocklyBlockCodeGenerator {
 			toolboxBlock.getDependencies().forEach(master::addDependency);
 
 		Map<String, Object> dataModel = new HashMap<>();
+
+		dataModel.put("parent", master.getParent());
 
 		// we get the list of all elements present in the actual xml
 		List<Element> elements = XMLUtil.getDirectChildren(block);
@@ -145,7 +130,7 @@ public class BlocklyBlockCodeGenerator {
 
 		// next we check for advanced inputs if they exist, we process them and add to data model
 		if (!toolboxBlock.getAdvancedInputs().isEmpty()) {
-			for (var advancedInput : toolboxBlock.getAdvancedInputs()) {
+			for (AdvancedInput advancedInput : toolboxBlock.getAdvancedInputs()) {
 				boolean found = false;
 				for (Element element : elements) {
 					if (element.getNodeName().equals("value") && element.getAttribute("name")
@@ -220,6 +205,161 @@ public class BlocklyBlockCodeGenerator {
 			}
 		}
 
+		// next we check for field groups if they are defined, we process them and add to data model
+		if (toolboxBlock.getRepeatingFields() != null) {
+			for (RepeatingField fieldEntry : toolboxBlock.getRepeatingFields()) {
+				String fieldName = fieldEntry.name();
+				Map<String, Element> matchingElements = elements.stream()
+						.filter(e -> e.getNodeName().equals("field") && e.getAttribute("name")
+								.matches(fieldName + "\\d+"))
+						.collect(Collectors.toMap(e -> e.getAttribute("name"), e -> e));
+				Element mutation = XMLUtil.getFirstChildrenWithName(block, "mutation");
+				Map<Integer, String> processedElements = new HashMap<>();
+				for (int i = 0; mutation != null && mutation.hasAttribute("inputs") ?
+						i < Integer.parseInt(mutation.getAttribute("inputs")) :
+						!matchingElements.isEmpty(); i++) {
+					if (matchingElements.containsKey(fieldName + i)) {
+						String fieldValue = matchingElements.remove(fieldName + i).getTextContent();
+						if (fieldValue != null && !fieldValue.equals("")) {
+							processedElements.put(i, fieldValue);
+							continue;
+						}
+					}
+					processedElements.put(i, null); // we add null at this index to not shift other elements
+					master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+							L10N.t("blockly.errors.field_not_defined", fieldName + i, type)));
+				}
+				if (processedElements.containsValue(null))
+					return; // no need to do further processing, this needs to be resolved first by the user
+
+				dataModel.put("field_list$" + fieldName,
+						processedElements.entrySet().stream().sorted(Map.Entry.comparingByKey())
+								.map(Map.Entry::getValue).toArray(String[]::new));
+			}
+		}
+
+		// next we check for input groups if they are defined, we process them and add to data model
+		if (!toolboxBlock.getRepeatingInputs().isEmpty()) {
+			for (String inputName : toolboxBlock.getRepeatingInputs()) {
+				Map<String, Element> matchingElements = elements.stream()
+						.filter(e -> e.getNodeName().equals("value") && e.getAttribute("name")
+								.matches(inputName + "\\d+"))
+						.collect(Collectors.toMap(e -> e.getAttribute("name"), e -> e));
+				Element mutation = XMLUtil.getFirstChildrenWithName(block, "mutation");
+				Map<Integer, String> processedElements = new HashMap<>();
+				for (int i = 0; mutation != null && mutation.hasAttribute("inputs") ?
+						i < Integer.parseInt(mutation.getAttribute("inputs")) :
+						!matchingElements.isEmpty(); i++) {
+					if (matchingElements.containsKey(inputName + i)) {
+						String generatedCode = BlocklyToCode.directProcessOutputBlock(master,
+								matchingElements.remove(inputName + i));
+						processedElements.put(i, generatedCode);
+					} else {
+						processedElements.put(i, null); // we add null at this index to not shift other elements
+						master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+								L10N.t("blockly.errors.input_empty", inputName + i, type)));
+					}
+				}
+				if (processedElements.containsValue(null))
+					return; // no need to do further processing, this needs to be resolved first by the user
+
+				dataModel.put("input_list$" + inputName,
+						processedElements.entrySet().stream().sorted(Map.Entry.comparingByKey())
+								.map(Map.Entry::getValue).toArray(String[]::new));
+			}
+		}
+
+		// next we check for advanced input groups if they are defined, we process them and add to data model
+		if (!toolboxBlock.getRepeatingAdvancedInputs().isEmpty()) {
+			for (AdvancedInput advancedInput : toolboxBlock.getRepeatingAdvancedInputs()) {
+				Map<String, Element> matchingElements = elements.stream()
+						.filter(e -> e.getNodeName().equals("value") && e.getAttribute("name")
+								.matches(advancedInput.name() + "\\d+"))
+						.collect(Collectors.toMap(e -> e.getAttribute("name"), e -> e));
+				Element mutation = XMLUtil.getFirstChildrenWithName(block, "mutation");
+				Map<Integer, String> processedElements = new HashMap<>();
+				for (int i = 0; mutation != null && mutation.hasAttribute("inputs") ?
+						i < Integer.parseInt(mutation.getAttribute("inputs")) :
+						!matchingElements.isEmpty(); i++) {
+					if (matchingElements.containsKey(advancedInput.name() + i)) {
+						// check if nesting statement block that already provides any dependency with
+						// a same name, to avoid compile errors due to variable redefinitions
+						if (advancedInput.provides != null) {
+							for (Dependency dependency : advancedInput.provides) {
+								if (master.checkIfDepProviderInputsProvide(dependency)) {
+									master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+											L10N.t("blockly.errors.duplicate_dependencies_provided",
+													advancedInput.name() + i)));
+									return; // no need to do further processing, this needs to be resolved first by the user
+								}
+							}
+						}
+
+						master.pushDepProviderInputStack(advancedInput);
+						String generatedCode = BlocklyToCode.directProcessOutputBlock(master,
+								matchingElements.remove(advancedInput.name() + i));
+						master.popDepProviderInputStack();
+
+						processedElements.put(i, generatedCode);
+					} else {
+						processedElements.put(i, null); // we add null at this index to not shift other elements
+						master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+								L10N.t("blockly.errors.input_empty", advancedInput.name() + i, type)));
+					}
+				}
+				if (processedElements.containsValue(null))
+					return; // no need to do further processing, this needs to be resolved first by the user
+
+				dataModel.put("input_list$" + advancedInput.name(),
+						processedElements.entrySet().stream().sorted(Map.Entry.comparingByKey())
+								.map(Map.Entry::getValue).toArray(String[]::new));
+			}
+		}
+
+		// next we check for statement input groups if they are defined, we process them and add to data model
+		if (toolboxBlock.getRepeatingStatements() != null) {
+			for (StatementInput statementInput : toolboxBlock.getRepeatingStatements()) {
+				Map<String, Element> matchingElements = elements.stream()
+						.filter(e -> e.getNodeName().equals("statement") && e.getAttribute("name")
+								.matches(statementInput.name() + "\\d+"))
+						.collect(Collectors.toMap(e -> e.getAttribute("name"), e -> e));
+				Element mutation = XMLUtil.getFirstChildrenWithName(block, "mutation");
+				Map<Integer, String> processedElements = new HashMap<>();
+				for (int i = 0; mutation != null && mutation.hasAttribute("inputs") ?
+						i < Integer.parseInt(mutation.getAttribute("inputs")) :
+						!matchingElements.isEmpty(); i++) {
+					if (matchingElements.containsKey(statementInput.name + i)) {
+						// check if nesting statement block that already provides any dependency with
+						// a same name, to avoid compile errors due to variable redefinitions
+						if (statementInput.provides != null) {
+							for (Dependency dependency : statementInput.provides) {
+								if (master.checkIfDepProviderInputsProvide(dependency)) {
+									master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+											L10N.t("blockly.errors.duplicate_dependencies_provided.statement",
+													statementInput.name + i)));
+									return; // no need to do further processing, this needs to be resolved first by the user
+								}
+							}
+						}
+
+						master.pushDepProviderInputStack(statementInput);
+						String generatedCode = BlocklyToCode.directProcessStatementBlock(master,
+								matchingElements.remove(statementInput.name + i));
+						master.popDepProviderInputStack();
+
+						processedElements.put(i, generatedCode);
+					} else {
+						processedElements.put(i, "");
+						master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
+								L10N.t("blockly.warnings.statement_input_empty", statementInput.name + i, type)));
+					}
+				}
+				dataModel.put("statement_list$" + statementInput.name,
+						processedElements.entrySet().stream().sorted(Map.Entry.comparingByKey())
+								.map(Map.Entry::getValue).toArray(String[]::new));
+			}
+		}
+
 		if (toolboxBlock.getRequiredAPIs() != null) {
 			for (String required_api : toolboxBlock.getRequiredAPIs()) {
 				if (!master.getWorkspaceSettings().getMCreatorDependencies().contains(required_api)) {
@@ -234,6 +374,23 @@ public class BlocklyBlockCodeGenerator {
 			for (String warning : toolboxBlock.getWarnings()) {
 				master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
 						L10N.t("blockly.warning." + warning, type)));
+			}
+		}
+
+		// Some other generator may support this block, so we check if it is supported last in the chain before generating actual code
+		// This way dependency structure is not generator dependant and also if there are problems with sub-blocks (inputs, statements, ...),
+		// they are reported as those problems may be relevant for some other generator when/if it is switched
+		if (toolboxBlock.getType() == IBlockGenerator.BlockType.PROCEDURAL) {
+			if (!supportedBlocksGenerator.contains(type)) {
+				master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.WARNING,
+						L10N.t("blockly.warnings.block_not_supported", type)));
+				return;
+			}
+		} else if (toolboxBlock.getType() == IBlockGenerator.BlockType.OUTPUT) {
+			if (!supportedBlocksGenerator.contains(type)) {
+				master.addCompileNote(new BlocklyCompileNote(BlocklyCompileNote.Type.ERROR,
+						L10N.t("blockly.errors.block_not_supported", type)));
+				return;
 			}
 		}
 
@@ -258,8 +415,8 @@ public class BlocklyBlockCodeGenerator {
 		if (blocks_machine_names.containsKey(blockType)) {
 			return blocks_machine_names.get(blockType);
 		} else {
-			String[] retval = blocks.values().stream().filter(block -> block.type == blockType)
-					.map(block -> block.machine_name).toArray(String[]::new);
+			String[] retval = blocks.values().stream().filter(block -> block.getType() == blockType)
+					.map(ToolboxBlock::getMachineName).toArray(String[]::new);
 			blocks_machine_names.put(blockType, retval);
 			return retval;
 		}

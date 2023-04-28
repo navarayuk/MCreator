@@ -19,6 +19,7 @@
 
 package net.mcreator.element;
 
+import net.mcreator.element.parts.procedure.Procedure;
 import net.mcreator.generator.GeneratorStats;
 import net.mcreator.ui.MCreator;
 import net.mcreator.ui.init.L10N;
@@ -34,7 +35,6 @@ public class ModElementType<GE extends GeneratableElement> {
 
 	private final String registryName;
 	private final BaseType baseType;
-	private final RecipeType recipeType;
 
 	private final ModElementGUIProvider<GE> modElementGUIProvider;
 	private final Class<? extends GE> modElementStorageClass;
@@ -46,10 +46,9 @@ public class ModElementType<GE extends GeneratableElement> {
 
 	private boolean hasProcedureTriggers;
 
-	public ModElementType(String registryName, Character shortcut, BaseType baseType, RecipeType recipeType,
+	public ModElementType(String registryName, Character shortcut, BaseType baseType,
 			ModElementGUIProvider<GE> modElementGUIProvider, Class<? extends GE> modElementStorageClass) {
 		this.baseType = baseType;
-		this.recipeType = recipeType;
 		this.registryName = registryName;
 		this.shortcut = shortcut;
 
@@ -60,7 +59,7 @@ public class ModElementType<GE extends GeneratableElement> {
 		this.description = L10N.t("modelement." + registryName.toLowerCase(Locale.ENGLISH) + ".description");
 
 		for (Field field : modElementStorageClass.getFields())
-			if (field.getType().isAssignableFrom(net.mcreator.element.parts.Procedure.class)) {
+			if (field.getType().isAssignableFrom(Procedure.class)) {
 				hasProcedureTriggers = true;
 				break;
 			}
@@ -72,10 +71,6 @@ public class ModElementType<GE extends GeneratableElement> {
 
 	public Character getShortcut() {
 		return shortcut;
-	}
-
-	public RecipeType getRecipeType() {
-		return recipeType;
 	}
 
 	public BaseType getBaseType() {
@@ -98,7 +93,7 @@ public class ModElementType<GE extends GeneratableElement> {
 		return modElementGUIProvider.get(mcreator, modElement, editingMode);
 	}
 
-	public Class<? extends GeneratableElement> getModElementStorageClass() {
+	public Class<? extends GE> getModElementStorageClass() {
 		return modElementStorageClass;
 	}
 
@@ -139,6 +134,7 @@ public class ModElementType<GE extends GeneratableElement> {
 	public static ModElementType<?> DIMENSION;
 	public static ModElementType<?> CODE;
 	public static ModElementType<?> ENCHANTMENT;
+	public static ModElementType<?> FEATURE;
 	public static ModElementType<?> FLUID;
 	public static ModElementType<?> FUNCTION;
 	public static ModElementType<?> GAMERULE;
