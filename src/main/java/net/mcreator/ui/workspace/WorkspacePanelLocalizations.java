@@ -22,6 +22,7 @@ import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import com.univocity.parsers.csv.CsvWriter;
 import com.univocity.parsers.csv.CsvWriterSettings;
+import net.mcreator.generator.GeneratorStats;
 import net.mcreator.io.FileIO;
 import net.mcreator.ui.component.TransparentToolBar;
 import net.mcreator.ui.component.util.ComponentUtils;
@@ -49,9 +50,8 @@ import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-class WorkspacePanelLocalizations extends JPanel implements IReloadableFilterable {
+class WorkspacePanelLocalizations extends AbstractWorkspacePanel {
 
-	private final WorkspacePanel workspacePanel;
 	private final JTabbedPane pane;
 	private ArrayList<TableRowSorter<TableModel>> sorters = new ArrayList<>();
 
@@ -62,10 +62,7 @@ class WorkspacePanelLocalizations extends JPanel implements IReloadableFilterabl
 	private final JButton imp;
 
 	WorkspacePanelLocalizations(WorkspacePanel workspacePanel) {
-		super(new BorderLayout());
-		setOpaque(false);
-
-		this.workspacePanel = workspacePanel;
+		super(workspacePanel);
 
 		pane = new JTabbedPane();
 		pane.setOpaque(false);
@@ -122,7 +119,7 @@ class WorkspacePanelLocalizations extends JPanel implements IReloadableFilterabl
 			String key = JOptionPane.showInputDialog(workspacePanel.getMCreator(),
 					L10N.t("workspace.localization.key_name_message"), L10N.t("workspace.localization.key_name_title"),
 					JOptionPane.QUESTION_MESSAGE);
-			if (key != null && !key.equals("")) {
+			if (key != null && !key.isEmpty()) {
 				workspacePanel.getMCreator().getWorkspace().setLocalization(key, "");
 				reloadElements();
 			}
@@ -215,7 +212,7 @@ class WorkspacePanelLocalizations extends JPanel implements IReloadableFilterabl
 					}
 					workspacePanel.getMCreator().getWorkspace().updateLanguage(entry.getKey(), keyValueMap);
 				}
-			}).start());
+			}, "WorkspaceLocalizationsReload").start());
 
 			JScrollPane sp = new JScrollPane(elements);
 			sp.setOpaque(false);
@@ -413,6 +410,11 @@ class WorkspacePanelLocalizations extends JPanel implements IReloadableFilterabl
 				reloadElements();
 			}
 		}
+	}
+
+	@Override public boolean isSupportedInWorkspace() {
+		return workspacePanel.getMCreator().getGeneratorStats().getBaseCoverageInfo().get("i18n")
+				!= GeneratorStats.CoverageStatus.NONE;
 	}
 
 	@Override public void refilterElements() {

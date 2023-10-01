@@ -25,6 +25,7 @@ import net.mcreator.io.Transliteration;
 import net.mcreator.minecraft.ElementUtil;
 import net.mcreator.ui.MCreator;
 import net.mcreator.ui.MCreatorApplication;
+import net.mcreator.ui.component.JMinMaxSpinner;
 import net.mcreator.ui.component.util.ComboBoxUtil;
 import net.mcreator.ui.component.util.ComponentUtils;
 import net.mcreator.ui.component.util.PanelUtils;
@@ -33,12 +34,13 @@ import net.mcreator.ui.help.HelpUtils;
 import net.mcreator.ui.init.L10N;
 import net.mcreator.ui.init.UIRES;
 import net.mcreator.ui.minecraft.BiomeListField;
-import net.mcreator.ui.minecraft.DimensionListField;
 import net.mcreator.ui.minecraft.MCItemListField;
 import net.mcreator.ui.procedure.ProcedureSelector;
 import net.mcreator.ui.validation.AggregatedValidationResult;
 import net.mcreator.ui.validation.ValidationGroup;
+import net.mcreator.ui.validation.validators.ItemListFieldSingleTagValidator;
 import net.mcreator.ui.validation.validators.ItemListFieldValidator;
+import net.mcreator.ui.validation.validators.ItemListFieldSingleTagValidator;
 import net.mcreator.util.FilenameUtilsPatched;
 import net.mcreator.workspace.elements.ModElement;
 import net.mcreator.workspace.elements.VariableTypeLoader;
@@ -49,12 +51,9 @@ import java.awt.*;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.Locale;
 
 public class StructureGenGUI extends ModElementGUI<Structure> {
-
-	private DimensionListField spawnWorldTypes;
 
 	private final JComboBox<String> spawnLocation = new JComboBox<>(new String[] { "Ground", "Air", "Underground" });
 	private final JComboBox<String> ignoreBlocks = new JComboBox<>(
@@ -69,8 +68,7 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 	private final JSpinner spawnOffsetX = new JSpinner(new SpinnerNumberModel(0, -128, 128, 1));
 	private final JSpinner spawnOffsetZ = new JSpinner(new SpinnerNumberModel(0, -128, 128, 1));
 
-	private final JSpinner minCountPerChunk = new JSpinner(new SpinnerNumberModel(1, 1, 16, 1));
-	private final JSpinner maxCountPerChunk = new JSpinner(new SpinnerNumberModel(1, 1, 16, 1));
+	private final JMinMaxSpinner countPerChunk = new JMinMaxSpinner(1, 1, 1, 16, 1);
 
 	private BiomeListField restrictionBiomes;
 	private MCItemListField restrictionBlocks;
@@ -103,9 +101,8 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 				L10N.t("condition.common.no_additional"));
 
 		restrictionBlocks = new MCItemListField(mcreator, ElementUtil::loadBlocks);
-		restrictionBiomes = new BiomeListField(mcreator);
-		spawnWorldTypes = new DimensionListField(mcreator);
-		spawnWorldTypes.setListElements(Collections.singletonList("Surface"));
+		restrictionBiomes = new BiomeListField(mcreator, true);
+		countPerChunk.setAllowEqualValues(true);
 
 		JPanel pane5 = new JPanel(new BorderLayout(3, 3));
 
@@ -113,7 +110,7 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 
 		ComponentUtils.deriveFont(structureSelector, 16);
 
-		JPanel params = new JPanel(new GridLayout(11, 2, 50, 2));
+		JPanel params = new JPanel(new GridLayout(10, 2, 50, 2));
 		params.setOpaque(false);
 
 		JButton importnbt = new JButton(UIRES.get("18px.add"));
@@ -140,8 +137,8 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 		params.add(spawnProbability);
 
 		params.add(HelpUtils.wrapWithHelpButton(this.withEntry("structure/group_size"),
-				L10N.label("elementgui.structuregen.structure_group")));
-		params.add(PanelUtils.gridElements(1, 2, 5, 5, minCountPerChunk, maxCountPerChunk));
+				L10N.label("elementgui.structuregen.structure_group_size")));
+		params.add(countPerChunk);
 
 		params.add(HelpUtils.wrapWithHelpButton(this.withEntry("structure/random_rotation"),
 				L10N.label("elementgui.structuregen.random_structure_rotation")));
@@ -163,10 +160,6 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 				L10N.label("elementgui.structuregen.spawn_height_offset")));
 		params.add(PanelUtils.gridElements(1, 3, 2, 2, spawnOffsetX, spawnHeightOffset, spawnOffsetZ));
 
-		params.add(HelpUtils.wrapWithHelpButton(this.withEntry("structure/spawn_world_types"),
-				L10N.label("elementgui.structuregen.spawn_world_types")));
-		params.add(spawnWorldTypes);
-
 		params.add(HelpUtils.wrapWithHelpButton(this.withEntry("common/restrict_to_blocks"),
 				L10N.label("elementgui.structuregen.restrict_blocks")));
 		params.add(restrictionBlocks);
@@ -184,9 +177,11 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 		pane5.add("Center", PanelUtils.totalCenterInPanel(PanelUtils.northAndCenterElement(params,
 				PanelUtils.join(FlowLayout.LEFT, generateCondition, onStructureGenerated), 20, 20)));
 
-		spawnWorldTypes.setValidator(
-				new ItemListFieldValidator(spawnWorldTypes, L10N.t("elementgui.structuregen.error_select_world_type")));
-		page1group.addValidationElement(spawnWorldTypes);
+		restrictionBiomes.setValidator(new ItemListFieldSingleTagValidator(restrictionBiomes));
+		page1group.addValidationElement(restrictionBiomes);
+
+		restrictionBiomes.setValidator(new ItemListFieldSingleTagValidator(restrictionBiomes));
+		page1group.addValidationElement(restrictionBiomes);
 
 		addPage(pane5);
 	}
@@ -202,14 +197,9 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 	}
 
 	@Override protected AggregatedValidationResult validatePage(int page) {
-		if (structureSelector.getSelectedItem() == null || structureSelector.getSelectedItem().toString().equals("")) {
+		if (structureSelector.getSelectedItem() == null || structureSelector.getSelectedItem().toString().isEmpty())
 			return new AggregatedValidationResult.FAIL(L10N.t("elementgui.structuregen.error_select_structure_spawn"));
-		} else if ((int) minCountPerChunk.getValue() > (int) maxCountPerChunk.getValue()) {
-			return new AggregatedValidationResult.FAIL(L10N.t("validator.minimal_lower_than_maximal",
-					L10N.t("elementgui.structuregen.structure_group_size")));
-		} else {
-			return new AggregatedValidationResult(page1group);
-		}
+		return new AggregatedValidationResult(page1group);
 	}
 
 	@Override public void openInEditingMode(Structure structure) {
@@ -217,12 +207,11 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 		spawnHeightOffset.setValue(structure.spawnHeightOffset);
 		spawnOffsetX.setValue(structure.spawnXOffset);
 		spawnOffsetZ.setValue(structure.spawnZOffset);
-		minCountPerChunk.setValue(structure.minCountPerChunk);
-		maxCountPerChunk.setValue(structure.maxCountPerChunk);
+		countPerChunk.setMinValue(structure.minCountPerChunk);
+		countPerChunk.setMaxValue(structure.maxCountPerChunk);
 		spawnLocation.setSelectedItem(structure.spawnLocation);
 		ignoreBlocks.setSelectedItem(structure.ignoreBlocks);
 		surfaceDetectionType.setSelectedItem(structure.surfaceDetectionType);
-		spawnWorldTypes.setListElements(structure.spawnWorldTypes);
 		randomlyRotateStructure.setSelected(structure.randomlyRotateStructure);
 		structureSelector.setSelectedItem(structure.structure);
 		restrictionBlocks.setListElements(structure.restrictionBlocks);
@@ -237,9 +226,8 @@ public class StructureGenGUI extends ModElementGUI<Structure> {
 		structure.spawnHeightOffset = (int) spawnHeightOffset.getValue();
 		structure.spawnXOffset = (int) spawnOffsetX.getValue();
 		structure.spawnZOffset = (int) spawnOffsetZ.getValue();
-		structure.minCountPerChunk = (int) minCountPerChunk.getValue();
-		structure.maxCountPerChunk = (int) maxCountPerChunk.getValue();
-		structure.spawnWorldTypes = spawnWorldTypes.getListElements();
+		structure.minCountPerChunk = countPerChunk.getIntMinValue();
+		structure.maxCountPerChunk = countPerChunk.getIntMaxValue();
 		structure.spawnLocation = (String) spawnLocation.getSelectedItem();
 		structure.ignoreBlocks = (String) ignoreBlocks.getSelectedItem();
 		structure.surfaceDetectionType = (String) surfaceDetectionType.getSelectedItem();

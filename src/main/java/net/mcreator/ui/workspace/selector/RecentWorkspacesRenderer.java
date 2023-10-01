@@ -19,6 +19,7 @@
 package net.mcreator.ui.workspace.selector;
 
 import net.mcreator.generator.GeneratorFlavor;
+import net.mcreator.ui.init.L10N;
 import net.mcreator.ui.laf.MCreatorTheme;
 import net.mcreator.util.StringUtils;
 import net.mcreator.util.image.ImageUtils;
@@ -26,6 +27,7 @@ import net.mcreator.util.image.ImageUtils;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
+import java.util.Objects;
 
 class RecentWorkspacesRenderer extends JLabel implements ListCellRenderer<RecentWorkspaceEntry> {
 
@@ -50,12 +52,15 @@ class RecentWorkspacesRenderer extends JLabel implements ListCellRenderer<Recent
 
 		setOpaque(true);
 
-		setBackground((Color) UIManager.get("MCreatorLAF.DARK_ACCENT"));
+		setBackground((Color) UIManager.get("MCreatorLAF.BLACK_ACCENT"));
 		setForeground(isSelected ?
 				(Color) UIManager.get("MCreatorLAF.MAIN_TINT") :
 				(Color) UIManager.get("MCreatorLAF.GRAY_COLOR"));
 
 		setFont(MCreatorTheme.secondary_font.deriveFont(16.0f));
+
+		setToolTipText(L10N.t("dialog.workspace_selector.recent_workspace", value.getName(), path,
+				Objects.requireNonNullElse(value.getMCRVersion(), L10N.t("common.not_applicable"))));
 
 		setBorder(BorderFactory.createEmptyBorder(2, version != null ? 23 : 5, 3, 0));
 
@@ -68,13 +73,13 @@ class RecentWorkspacesRenderer extends JLabel implements ListCellRenderer<Recent
 					icon);
 
 			setIconTextGap(8);
-			setText("<html><font style=\"font-size: 15px;\">" + StringUtils.abbreviateString(value.getName(), 18)
+			setText("<html><font style=\"font-size: 15px;\">" + StringUtils.abbreviateString(value.getName(), 17)
 					+ "</font><small><br>" + StringUtils.abbreviateStringInverse(path, 30));
 		} else {
 			setIcon(null);
 
 			setIconTextGap(0);
-			setText("<html><font style=\"font-size: 15px;\">" + StringUtils.abbreviateString(value.getName(), 20)
+			setText("<html><font style=\"font-size: 15px;\">" + StringUtils.abbreviateString(value.getName(), 19)
 					+ "</font><small><br>" + StringUtils.abbreviateStringInverse(path, 37));
 		}
 

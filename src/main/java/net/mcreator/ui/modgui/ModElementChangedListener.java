@@ -21,7 +21,7 @@ package net.mcreator.ui.modgui;
 
 import javafx.embed.swing.JFXPanel;
 import net.mcreator.ui.component.JItemListField;
-import net.mcreator.ui.minecraft.JEntriesList;
+import net.mcreator.ui.component.entries.JEntriesList;
 import net.mcreator.ui.minecraft.MCItemHolder;
 
 import javax.swing.*;
@@ -55,6 +55,9 @@ public interface ModElementChangedListener
 	 */
 	default void registerUI(JComponent container) {
 		for (Component component : container.getComponents()) {
+			if ("TechnicalComponent".equals(component.getName()))
+				continue; // don't add listeners if component triggers actions not affecting mod element directly
+
 			if (component instanceof MCItemHolder itemHolder) {
 				itemHolder.addBlockSelectedListener(this);
 			} else if (component instanceof JItemListField<?> listField) {
@@ -66,8 +69,7 @@ public interface ModElementChangedListener
 					modElementChanged();
 				});
 				component.addMouseListener(this);
-			} else if (component instanceof AbstractButton button && !"AddEntryButton".equals(
-					button.getName())) { // this check resolves conflicts with JEntriesLists, letting their entries trigger the listener
+			} else if (component instanceof AbstractButton button) {
 				button.addActionListener(this);
 			} else if (component instanceof JSpinner spinner) {
 				spinner.addChangeListener(this);

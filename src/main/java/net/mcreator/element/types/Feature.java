@@ -20,12 +20,14 @@
 package net.mcreator.element.types;
 
 import net.mcreator.blockly.data.BlocklyLoader;
+import net.mcreator.blockly.data.BlocklyXML;
 import net.mcreator.blockly.feature.BlocklyToFeature;
 import net.mcreator.element.BaseType;
 import net.mcreator.element.GeneratableElement;
 import net.mcreator.element.parts.BiomeEntry;
 import net.mcreator.element.parts.procedure.Procedure;
 import net.mcreator.element.types.interfaces.ICommonType;
+import net.mcreator.generator.GeneratorFlavor;
 import net.mcreator.generator.blockly.BlocklyBlockCodeGenerator;
 import net.mcreator.generator.blockly.OutputBlockCodeGenerator;
 import net.mcreator.generator.blockly.ProceduralBlockCodeGenerator;
@@ -44,16 +46,14 @@ import java.util.List;
 	public static final String XML_BASE = "<xml xmlns=\"https://developers.google.com/blockly/xml\"><block type=\"feature_container\" deletable=\"false\" x=\"40\" y=\"40\"></block></xml>";
 
 	public String generationStep;
-	public List<String> restrictionDimensions;
 	public List<BiomeEntry> restrictionBiomes;
 	public Procedure generateCondition;
-	public String featurexml;
+	@BlocklyXML("features") public String featurexml;
 
 	public Feature(ModElement element) {
 		super(element);
 
 		this.generationStep = "SURFACE_STRUCTURES";
-		this.restrictionDimensions = new ArrayList<>();
 		this.restrictionBiomes = new ArrayList<>();
 	}
 
@@ -64,10 +64,7 @@ import java.util.List;
 					getModElement().getGenerator().getGeneratorStats().getBlocklyBlocks(BlocklyEditorType.FEATURE),
 					this.getModElement().getGenerator()
 							.getTemplateGeneratorFromName(BlocklyEditorType.FEATURE.registryName()),
-					additionalData).setTemplateExtension(
-					this.getModElement().getGeneratorConfiguration().getGeneratorName().equals("forge-1.18.2") ?
-							"java" :
-							"json"); // 1.18 features are in Java
+					additionalData).setTemplateExtension("json");
 
 			var blocklyToFeature = new BlocklyToFeature(this.getModElement().getWorkspace(), this.getModElement(),
 					this.featurexml, this.getModElement().getGenerator()
@@ -78,18 +75,24 @@ import java.util.List;
 			additionalData.put("placementcode", blocklyToFeature.getGeneratedCode());
 			additionalData.put("configurationcode", blocklyToFeature.getFeatureConfigurationCode());
 			additionalData.put("featuretype", blocklyToFeature.getFeatureType());
+			additionalData.put("featureblocks", blocklyToFeature.getUsedBlocks());
+
+			this.getModElement().clearMetadata().putMetadata("has_nbt_structure",
+					blocklyToFeature.getUsedBlocks().contains("feature_custom_structure") ? true : null);
 		};
 	}
 
 	public boolean hasGenerationConditions() {
-		return restrictionDimensions.size() > 0 || generateCondition != null;
+		return generateCondition != null;
 	}
 
 	@Override public Collection<BaseType> getBaseTypesProvided() {
-		if (hasGenerationConditions() || this.getModElement().getGeneratorConfiguration().getGeneratorName()
-				.equals("forge-1.18.2")) {
+		if (getModElement().getGenerator().getGeneratorConfiguration().getGeneratorFlavor() == GeneratorFlavor.FABRIC)
+			return List.of(BaseType.FEATURE); // Fabric needs to be handled differently than Forge
+		else if (hasGenerationConditions())
 			return List.of(BaseType.FEATURE);
-		}
-		return Collections.emptyList();
+		else
+			return Collections.emptyList();
 	}
+
 }

@@ -38,11 +38,12 @@ import net.mcreator.ui.gradle.GradleConsole;
 import net.mcreator.ui.init.BackgroundLoader;
 import net.mcreator.ui.init.L10N;
 import net.mcreator.ui.init.UIRES;
+import net.mcreator.ui.notifications.INotificationConsumer;
+import net.mcreator.ui.notifications.NotificationsRenderer;
 import net.mcreator.ui.workspace.WorkspacePanel;
 import net.mcreator.util.ListUtils;
 import net.mcreator.util.MCreatorVersionNumber;
 import net.mcreator.util.image.ImageUtils;
-import net.mcreator.vcs.WorkspaceVCS;
 import net.mcreator.workspace.IWorkspaceProvider;
 import net.mcreator.workspace.ShareableZIPManager;
 import net.mcreator.workspace.Workspace;
@@ -62,7 +63,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public final class MCreator extends JFrame implements IWorkspaceProvider, IGeneratorProvider {
+public final class MCreator extends JFrame implements IWorkspaceProvider, IGeneratorProvider, INotificationConsumer {
 
 	private static final Logger LOG = LogManager.getLogger("MCreator");
 
@@ -90,18 +91,14 @@ public final class MCreator extends JFrame implements IWorkspaceProvider, IGener
 
 	private final long windowUID;
 
+	private final NotificationsRenderer notificationsRenderer;
+
 	public MCreator(@Nullable MCreatorApplication application, @Nonnull Workspace workspace) {
 		LOG.info("Opening MCreator workspace: " + workspace.getWorkspaceSettings().getModID());
 
 		this.windowUID = System.currentTimeMillis();
 		this.workspace = workspace;
 		this.application = application;
-
-		WorkspaceVCS vcs = WorkspaceVCS.loadVCSWorkspace(this.workspace);
-		if (vcs != null) {
-			this.workspace.setVCS(vcs);
-			LOG.info("Loaded VCS for current workspace");
-		}
 
 		this.gradleConsole = new GradleConsole(this);
 		this.gradleConsole.addGradleStateListener(new GradleStateListener() {
@@ -146,7 +143,7 @@ public final class MCreator extends JFrame implements IWorkspaceProvider, IGener
 		if (PreferencesManager.PREFERENCES.hidden.fullScreen.get())
 			setExtendedState(JFrame.MAXIMIZED_BOTH);
 
-		setIconImage(UIRES.getBuiltIn("icon").getImage());
+		setIconImage(UIRES.getAppIcon().getImage());
 		setLocationRelativeTo(null);
 
 		setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
@@ -187,7 +184,7 @@ public final class MCreator extends JFrame implements IWorkspaceProvider, IGener
 		}
 
 		Image bgimage = null;
-		if (bgimages.size() > 0) {
+		if (!bgimages.isEmpty()) {
 			bgimage = ListUtils.getRandomItem(bgimages);
 			float avg = ImageUtils.getAverageLuminance(ImageUtils.toBufferedImage(bgimage));
 			if (avg > 0.15) {
@@ -266,6 +263,8 @@ public final class MCreator extends JFrame implements IWorkspaceProvider, IGener
 
 		workspaceFileBrowser.setMinimumSize(new Dimension(0, 0));
 
+		this.notificationsRenderer = new NotificationsRenderer(splitPane);
+
 		add("South", statusBar);
 		add("North", toolBar);
 		add("Center", splitPane);
@@ -335,6 +334,10 @@ public final class MCreator extends JFrame implements IWorkspaceProvider, IGener
 		return workspace;
 	}
 
+	@Override public NotificationsRenderer getNotificationsRenderer() {
+		return notificationsRenderer;
+	}
+
 	public StatusBar getStatusBar() {
 		return statusBar;
 	}
@@ -362,7 +365,13 @@ public final class MCreator extends JFrame implements IWorkspaceProvider, IGener
 			LOG.info("Closing MCreator window ...");
 			PreferencesManager.PREFERENCES.hidden.fullScreen.set(getExtendedState() == MAXIMIZED_BOTH);
 			if (splitPane != null)
-				PreferencesManager.PREFERENCES.hidden.projectTreeSplitPos.set(splitPane.getDividerLocation()); // this one could be stored per workspace in the future
+				PreferencesManager.PREFERENCES.hidden.projectTreeSplitPos.set(
+						splitPane.getDividerLocation()); // this one could be stored per workspace in the future
+
+			mcreatorTabs.getTabs().forEach(tab -> {
+				if (tab.getTabClosedListener() != null)
+					tab.getTabClosedListener().tabClosed(tab);
+			});
 
 			workspace.close();
 

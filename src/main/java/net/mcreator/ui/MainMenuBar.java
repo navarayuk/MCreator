@@ -49,7 +49,7 @@ public class MainMenuBar extends JMenuBar {
 
 		JMenu logo = new JMenu("  MCreator");
 		logo.setMnemonic('M');
-		logo.setIcon(new ImageIcon(ImageUtils.resizeAA(UIRES.getBuiltIn("icon").getImage(), 14, 14)));
+		logo.setIcon(new ImageIcon(ImageUtils.resizeAA(UIRES.getAppIcon().getImage(), 14, 14)));
 
 		logo.add(mcreator.actionRegistry.mcreatorWebsite);
 		logo.add(mcreator.actionRegistry.mcreatorCommunity);
@@ -216,19 +216,6 @@ public class MainMenuBar extends JMenuBar {
 		tools.add(dataLists);
 		add(tools);
 
-		JMenu vcs = L10N.menu("menubar.vcs");
-		vcs.setMnemonic('R');
-		vcs.add(mcreator.actionRegistry.setupVCS);
-		vcs.addSeparator();
-		vcs.add(mcreator.actionRegistry.showUnsyncedChanges);
-		vcs.addSeparator();
-		vcs.add(mcreator.actionRegistry.syncFromRemote);
-		vcs.add(mcreator.actionRegistry.syncToRemote);
-		vcs.addSeparator();
-		vcs.add(mcreator.actionRegistry.unlinkVCS);
-		vcs.add(mcreator.actionRegistry.remoteWorkspaceSettings);
-		add(vcs);
-
 		JMenu window = L10N.menu("menubar.window");
 		window.add(mcreator.actionRegistry.showWorkspaceBrowser);
 		window.add(mcreator.actionRegistry.hideWorkspaceBrowser);
@@ -252,6 +239,7 @@ public class MainMenuBar extends JMenuBar {
 		help.add(mcreator.actionRegistry.donate);
 		help.addSeparator();
 		help.add(mcreator.actionRegistry.checkForUpdates);
+		help.add(mcreator.actionRegistry.checkForPluginUpdates);
 		help.add(mcreator.actionRegistry.aboutMCreator);
 		help.setMnemonic('H');
 		add(help);
@@ -265,7 +253,7 @@ public class MainMenuBar extends JMenuBar {
 				super.paintComponent(g);
 				g.setColor(new Color(0x9C9C9C));
 				g.setFont(getFont().deriveFont(11.0f));
-				if (getText().equals(""))
+				if (getText().isEmpty())
 					g.drawString(L10N.t("menubar.help.search.tooltip"), 28, 14);
 			}
 		};

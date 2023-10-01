@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -61,6 +62,10 @@ public class ZipIO {
 	}
 
 	public static String readCodeInZip(File zipFilePointer, String path) {
+		return readFileInZip(zipFilePointer, path, ZipIO::entryToString);
+	}
+
+	public static <T> T readFileInZip(File zipFilePointer, String path, BiFunction<ZipFile, ZipEntry, T> transformer) {
 		if (path.startsWith("/"))
 			path = path.substring(1);
 
@@ -69,7 +74,7 @@ public class ZipIO {
 			while (entries.hasMoreElements()) {
 				ZipEntry zipEntry = entries.nextElement();
 				if (zipEntry.toString().startsWith(path)) {
-					return entryToString(zipFile, zipEntry);
+					return transformer.apply(zipFile, zipEntry);
 				}
 			}
 		} catch (IOException e) {
@@ -119,7 +124,7 @@ public class ZipIO {
 				if (Arrays.asList(excludes).contains("#" + fileName))
 					continue;
 
-				if (path.equals("")) {
+				if (path.isEmpty()) {
 					addFileToZip(folder.getName(), srcFolder + "/" + fileName, zip, false, excludes);
 				} else {
 					addFileToZip(path + "/" + folder.getName(), srcFolder + "/" + fileName, zip, false, excludes);
@@ -140,7 +145,7 @@ public class ZipIO {
 				byte[] buf = new byte[8192];
 				int len;
 				FileInputStream in = new FileInputStream(srcFile);
-				if (!path.equals(""))
+				if (!path.isEmpty())
 					zip.putNextEntry(new ZipEntry(path + "/" + file.getName()));
 				else
 					zip.putNextEntry(new ZipEntry(file.getName()));

@@ -67,7 +67,7 @@ public class AnimationMakerView extends ViewBase {
 	private int animindex = 0;
 	private boolean playanim = true;
 
-	private Thread animator;
+	private final Thread animator;
 
 	private int width = 16;
 	private boolean active;
@@ -156,14 +156,15 @@ public class AnimationMakerView extends ViewBase {
 								new ImageIcon(ImageUtils.resize(timelinevector.getElementAt(animindex).image, zoom)));
 						timeline.repaint();
 					});
-					try {
-						Thread.sleep(((Integer) bd1.getValue()) * (50));
-					} catch (InterruptedException e) {
-						LOG.error(e.getMessage(), e);
-					}
+				}
+
+				try {
+					//noinspection BusyWait
+					Thread.sleep(((Integer) bd1.getValue()) * (50));
+				} catch (InterruptedException ignored) {
 				}
 			}
-		});
+		}, "AnimationRenderer");
 
 		JButton play = new JButton("");
 		play.setIcon(UIRES.get("16px.play"));
@@ -263,9 +264,11 @@ public class AnimationMakerView extends ViewBase {
 							p1.ok();
 						else {
 							p1.err();
-							dial.setTopInfoText(L10N.t("dialog.animation_maker.gif_format_unsupported"));
-							Thread.sleep(3500);
 							dial.hideAll();
+
+							JOptionPane.showMessageDialog(fra, L10N.t("dialog.animation_maker.gif_format_unsupported"),
+									L10N.t("common.warning"), JOptionPane.ERROR_MESSAGE);
+
 							return;
 						}
 						dial.refreshDisplay();
@@ -287,7 +290,7 @@ public class AnimationMakerView extends ViewBase {
 						LOG.error(e.getMessage(), e);
 					}
 
-				});
+				}, "GIFFramesLoader");
 				t.start();
 				dial.setVisible(true);
 			}
@@ -338,7 +341,7 @@ public class AnimationMakerView extends ViewBase {
 	}
 
 	protected void use() {
-		Object[] options = TextureType.getTypes(false);
+		TextureType[] options = TextureType.getSupportedTypes(mcreator.getWorkspace(), false);
 		int n = JOptionPane.showOptionDialog(mcreator, L10N.t("dialog.animation_maker.kind_of_texture"),
 				L10N.t("dialog.animation_maker.type_of_texture"), JOptionPane.YES_NO_CANCEL_OPTION,
 				JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
@@ -348,7 +351,7 @@ public class AnimationMakerView extends ViewBase {
 		String namec = JOptionPane.showInputDialog(L10N.t("dialog.animation_maker.enter_texture_name"));
 		if (namec != null) {
 			namec = RegistryNameFixer.fix(namec);
-			File exportFile = mcreator.getFolderManager().getTextureFile(namec, TextureType.getTextureType(n, false));
+			File exportFile = mcreator.getFolderManager().getTextureFile(namec, options[n]);
 
 			if (exportFile.isFile()) {
 				JOptionPane.showMessageDialog(mcreator,
@@ -539,22 +542,18 @@ public class AnimationMakerView extends ViewBase {
 		else
 			b = bufferedImage;
 		int x = Math.min(b.getHeight(), b.getWidth());
-		TiledImageUtils tiledImageUtils = null;
 		try {
-			tiledImageUtils = new TiledImageUtils(b, x, x);
-		} catch (InvalidTileSizeException e) {
-			LOG.error(e.getMessage(), e);
-		}
-		if (tiledImageUtils != null)
-			for (int i = 1; i <= tiledImageUtils.getWidthInTiles(); i++)
+			TiledImageUtils tiledImageUtils = new TiledImageUtils(b, x, x);
+			for (int i = 1; i <= tiledImageUtils.getWidthInTiles(); i++) {
 				for (int j = 1; j <= tiledImageUtils.getHeightInTiles(); j++) {
 					BufferedImage buf;
-					if (colorize)
-						buf = ImageUtils.toBufferedImage(tiledImageUtils.getIcon(i, j).getImage());
-					else
-						buf = ImageUtils.toBufferedImage(tiledImageUtils.getIcon(i, j).getImage());
+					buf = ImageUtils.toBufferedImage(tiledImageUtils.getIcon(i, j).getImage());
 					timelinevector.addElement(new AnimationFrame(buf));
 				}
+			}
+		} catch (InvalidTileSizeException e) {
+			LOG.warn("Invalid tile size", e);
+		}
 	}
 
 	private class ComboBoxRenderer extends JPanel implements ListCellRenderer<AnimationFrame> {
@@ -616,10 +615,7 @@ public class AnimationMakerView extends ViewBase {
 
 	@Override public ViewBase showView() {
 		MCreatorTabs.Tab tab = new MCreatorTabs.Tab(this);
-		tab.setTabClosedListener(tab1 -> {
-			this.active = false;
-			this.animator = null;
-		});
+		tab.setTabClosedListener(tab1 -> this.active = false);
 		mcreator.mcreatorTabs.addTab(tab);
 		return this;
 	}

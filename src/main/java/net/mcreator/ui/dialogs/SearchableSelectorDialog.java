@@ -21,7 +21,6 @@ package net.mcreator.ui.dialogs;
 
 import net.mcreator.ui.MCreator;
 import net.mcreator.ui.component.util.ComponentUtils;
-import net.mcreator.ui.init.UIRES;
 import net.mcreator.workspace.Workspace;
 
 import javax.swing.*;
@@ -50,7 +49,6 @@ public abstract class SearchableSelectorDialog<T> extends MCreatorDialog {
 		this.provider = provider;
 
 		setModalityType(ModalityType.APPLICATION_MODAL);
-		setIconImage(UIRES.getBuiltIn("icon").getImage());
 
 		filterField.getDocument().addDocumentListener(new DocumentListener() {
 			@Override public void removeUpdate(DocumentEvent arg0) {

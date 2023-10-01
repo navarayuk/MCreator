@@ -18,6 +18,7 @@
 
 package net.mcreator.ui.workspace;
 
+import net.mcreator.generator.GeneratorStats;
 import net.mcreator.io.Transliteration;
 import net.mcreator.minecraft.ElementUtil;
 import net.mcreator.ui.MCreatorApplication;
@@ -50,19 +51,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-class WorkspacePanelVariables extends JPanel implements IReloadableFilterable {
+class WorkspacePanelVariables extends AbstractWorkspacePanel {
 
-	private final WorkspacePanel workspacePanel;
 	private final TableRowSorter<TableModel> sorter;
 	private final JTable elements;
 
 	private volatile boolean storingEdits = false;
 
 	WorkspacePanelVariables(WorkspacePanel workspacePanel) {
-		super(new BorderLayout(0, 5));
-		setOpaque(false);
-
-		this.workspacePanel = workspacePanel;
+		super(workspacePanel);
+		setLayout(new BorderLayout(0, 5));
 
 		elements = new JTable(new DefaultTableModel(
 				new Object[] { L10N.t("workspace.variables.variable_name"), L10N.t("workspace.variables.variable_type"),
@@ -273,11 +271,11 @@ class WorkspacePanelVariables extends JPanel implements IReloadableFilterable {
 					workspace.removeVariableElement(variableElement);
 
 				for (int i = 0; i < elements.getModel().getRowCount(); i++) {
-					VariableElement element = new VariableElement();
 					VariableType elementType = VariableTypeLoader.INSTANCE.fromName((String) elements.getValueAt(i, 1));
 					if (elementType != null) {
+						VariableElement element = new VariableElement(
+								Transliteration.transliterateString((String) elements.getValueAt(i, 0)));
 						element.setType(elementType);
-						element.setName(Transliteration.transliterateString((String) elements.getValueAt(i, 0)));
 						element.setValue(elements.getValueAt(i, 3));
 						element.setScope((VariableType.Scope) elements.getValueAt(i, 2));
 						workspace.addVariableElement(element);
@@ -287,7 +285,7 @@ class WorkspacePanelVariables extends JPanel implements IReloadableFilterable {
 				elements.setCursor(Cursor.getDefaultCursor());
 				storingEdits = false;
 			}
-		}).start());
+		}, "WorkspaceVariablesReload").start());
 
 	}
 
@@ -301,12 +299,16 @@ class WorkspacePanelVariables extends JPanel implements IReloadableFilterable {
 		if (n == JOptionPane.YES_OPTION) {
 			Arrays.stream(elements.getSelectedRows()).mapToObj(el -> (String) elements.getValueAt(el, 0))
 					.forEach(el -> {
-						VariableElement element = new VariableElement();
-						element.setName(el);
+						VariableElement element = new VariableElement(el);
 						workspacePanel.getMCreator().getWorkspace().removeVariableElement(element);
 					});
 			reloadElements();
 		}
+	}
+
+	@Override public boolean isSupportedInWorkspace() {
+		return workspacePanel.getMCreator().getGeneratorStats().getBaseCoverageInfo().get("variables")
+				!= GeneratorStats.CoverageStatus.NONE;
 	}
 
 	@Override public void reloadElements() {

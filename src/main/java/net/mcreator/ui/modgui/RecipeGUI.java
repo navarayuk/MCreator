@@ -25,7 +25,6 @@ import net.mcreator.minecraft.ElementUtil;
 import net.mcreator.minecraft.RegistryNameFixer;
 import net.mcreator.ui.MCreator;
 import net.mcreator.ui.MCreatorApplication;
-import net.mcreator.ui.component.JEmptyBox;
 import net.mcreator.ui.component.util.AdaptiveGridLayout;
 import net.mcreator.ui.component.util.ComponentUtils;
 import net.mcreator.ui.component.util.PanelUtils;
@@ -47,7 +46,6 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 public class RecipeGUI extends ModElementGUI<Recipe> {
 
@@ -62,7 +60,7 @@ public class RecipeGUI extends ModElementGUI<Recipe> {
 
 	private final JCheckBox recipeShapeless = L10N.checkbox("elementgui.common.enable");
 
-	private final JSpinner xpReward = new JSpinner(new SpinnerNumberModel(1.0, 0, 256, 1));
+	private final JSpinner xpReward = new JSpinner(new SpinnerNumberModel(1.0, 0, 256, 0.1));
 	private final JSpinner cookingTime = new JSpinner(new SpinnerNumberModel(200, 0, 1000000, 1));
 
 	private final JComboBox<String> namespace = new JComboBox<>(new String[] { "mod", "minecraft" });
@@ -75,8 +73,7 @@ public class RecipeGUI extends ModElementGUI<Recipe> {
 			new String[] { "Crafting", "Smelting", "Brewing", "Blasting", "Smoking", "Stone cutting",
 					"Campfire cooking", "Smithing" });
 
-	private final JComboBox<String> cookingBookCategory = new JComboBox<>(
-			new String[] { "MISC", "FOOD", "BLOCKS" });
+	private final JComboBox<String> cookingBookCategory = new JComboBox<>(new String[] { "MISC", "FOOD", "BLOCKS" });
 
 	private final JComboBox<String> craftingBookCategory = new JComboBox<>(
 			new String[] { "MISC", "BUILDING", "REDSTONE", "EQUIPMENT" });
@@ -143,7 +140,6 @@ public class RecipeGUI extends ModElementGUI<Recipe> {
 
 		JPanel pane5 = new JPanel(new BorderLayout(10, 10));
 
-
 		recipeShapeless.setOpaque(false);
 		recipeShapeless.addActionListener(event -> rm.setShapeless(recipeShapeless.isSelected()));
 
@@ -161,7 +157,8 @@ public class RecipeGUI extends ModElementGUI<Recipe> {
 		JComponent recwrap = PanelUtils.maxMargin(recipesPanel, 10, true, true, true, true);
 		recwrap.setBorder(BorderFactory.createTitledBorder(
 				BorderFactory.createLineBorder((Color) UIManager.get("MCreatorLAF.BRIGHT_COLOR"), 1),
-				L10N.t("elementgui.recipe.definition"), TitledBorder.LEADING, TitledBorder.DEFAULT_POSITION, getFont(), Color.white));
+				L10N.t("elementgui.recipe.definition"), TitledBorder.LEADING, TitledBorder.DEFAULT_POSITION, getFont(),
+				Color.white));
 
 		JPanel northPanel = new JPanel(new AdaptiveGridLayout(-1, 1, 10, 2));
 		northPanel.setOpaque(false);
@@ -174,29 +171,38 @@ public class RecipeGUI extends ModElementGUI<Recipe> {
 				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/registry_name"),
 						L10N.label("elementgui.recipe.registry_name")), name));
 
-		northPanel.add(namespacePanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/namespace"),
-				L10N.label("elementgui.recipe.name_space")), namespace));
+		northPanel.add(namespacePanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/namespace"),
+						L10N.label("elementgui.recipe.name_space")), namespace));
 
-		northPanel.add(groupPanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/group_name"),
-				L10N.label("elementgui.recipe.group")), group));
+		northPanel.add(groupPanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/group_name"),
+						L10N.label("elementgui.recipe.group")), group));
 
-		northPanel.add(craftingBookCategoryPanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/crafting_book_category"),
-				L10N.label("elementgui.recipe.crafting_book_category")), craftingBookCategory));
+		northPanel.add(craftingBookCategoryPanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/crafting_book_category"),
+						L10N.label("elementgui.recipe.crafting_book_category")), craftingBookCategory));
 
-		northPanel.add(cookingBookCategoryPanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/cooking_book_category"),
-				L10N.label("elementgui.recipe.cooking_book_category")), cookingBookCategory));
+		northPanel.add(cookingBookCategoryPanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/cooking_book_category"),
+						L10N.label("elementgui.recipe.cooking_book_category")), cookingBookCategory));
 
-		northPanel.add(shapelessPanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/shapeless"),
-				L10N.label("elementgui.recipe.is_shapeless")), recipeShapeless));
+		northPanel.add(shapelessPanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/shapeless"),
+						L10N.label("elementgui.recipe.is_shapeless")), recipeShapeless));
 
-		northPanel.add(xpRewardPanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/xp_reward"),
-				L10N.label("elementgui.recipe.xp_reward")), xpReward));
+		northPanel.add(xpRewardPanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/xp_reward"),
+						L10N.label("elementgui.recipe.xp_reward")), xpReward));
 
-		northPanel.add(cookingTimePanel = PanelUtils.gridElements(1, 2, HelpUtils.wrapWithHelpButton(this.withEntry("recipe/cooking_time"),
-				L10N.label("elementgui.recipe.cooking_time")), cookingTime));
+		northPanel.add(cookingTimePanel = PanelUtils.gridElements(1, 2,
+				HelpUtils.wrapWithHelpButton(this.withEntry("recipe/cooking_time"),
+						L10N.label("elementgui.recipe.cooking_time")), cookingTime));
 
 		pane5.setOpaque(false);
-		pane5.add(PanelUtils.totalCenterInPanel(PanelUtils.westAndEastElement(PanelUtils.pullElementUp(northPanel), PanelUtils.pullElementUp(recwrap), 15, 15)));
+		pane5.add(PanelUtils.totalCenterInPanel(
+				PanelUtils.westAndEastElement(PanelUtils.pullElementUp(northPanel), PanelUtils.pullElementUp(recwrap),
+						15, 15)));
 
 		recipeType.addActionListener(e -> updateUIFields());
 
@@ -211,12 +217,14 @@ public class RecipeGUI extends ModElementGUI<Recipe> {
 	private void updateUIFields() {
 		String recipeTypeValue = (String) recipeType.getSelectedItem();
 		if (recipeTypeValue != null) {
-			boolean isCookingRecipe = List.of("Smelting", "Blasting", "Smoking", "Campfire cooking").contains(recipeTypeValue);
+			boolean isCookingRecipe = List.of("Smelting", "Blasting", "Smoking", "Campfire cooking")
+					.contains(recipeTypeValue);
 			xpRewardPanel.setVisible(isCookingRecipe);
 			cookingTimePanel.setVisible(isCookingRecipe);
 			cookingBookCategoryPanel.setVisible(isCookingRecipe);
 
-			boolean isRecipeJSON = List.of("Crafting", "Smelting", "Blasting", "Smoking", "Stone cutting", "Campfire cooking", "Smithing").contains(recipeTypeValue);
+			boolean isRecipeJSON = List.of("Crafting", "Smelting", "Blasting", "Smoking", "Stone cutting",
+					"Campfire cooking", "Smithing").contains(recipeTypeValue);
 			groupPanel.setVisible(isRecipeJSON);
 			namespacePanel.setVisible(isRecipeJSON);
 			namePanel.setVisible(isRecipeJSON);

@@ -20,6 +20,8 @@ package net.mcreator.ui.init;
 
 import net.mcreator.plugin.PluginLoader;
 import net.mcreator.preferences.PreferencesManager;
+import net.mcreator.ui.component.TechnicalButton;
+import net.mcreator.ui.dialogs.workspace.GeneratorSelector;
 import net.mcreator.ui.help.HelpLoader;
 import net.mcreator.util.FilenameUtilsPatched;
 import net.mcreator.util.locale.LocaleRegistration;
@@ -137,34 +139,25 @@ public class L10N {
 	}
 
 	public static String t(String key, Object... parameters) {
-		if (key == null)
-			return null;
-
-		if (rb.containsKey(key))
-			return MessageFormat.format(rb.getString(key), parameters);
-		else if (key.startsWith("blockly.") && (key.endsWith(".tooltip") || key.endsWith(".tip") || key.endsWith(
-				".description")))
-			return null;
-		else if (isTestingEnvironment)
-			throw new RuntimeException("Failed to load any translation for key: " + key);
-		else if (key.startsWith("blockly.") || key.startsWith("trigger."))
-			return null;
-		else
-			return key;
+		return t_impl(rb, key, parameters);
 	}
 
 	public static String t_en(String key, Object... parameters) {
+		return t_impl(rb_en, key, parameters);
+	}
+
+	private static String t_impl(ResourceBundle resourceBundle, String key, Object... parameters) {
 		if (key == null)
 			return null;
 
-		if (rb_en.containsKey(key))
-			return MessageFormat.format(rb_en.getString(key), parameters);
+		if (resourceBundle.containsKey(key))
+			return MessageFormat.format(resourceBundle.getString(key), parameters);
 		else if (key.startsWith("blockly.") && (key.endsWith(".tooltip") || key.endsWith(".tip") || key.endsWith(
 				".description")))
 			return null;
 		else if (isTestingEnvironment)
 			throw new RuntimeException("Failed to load any translation for key: " + key);
-		else if (key.startsWith("blockly.") || key.startsWith("trigger."))
+		else if (key.startsWith("blockly.") || key.startsWith("trigger.") || key.startsWith(GeneratorSelector.covpfx))
 			return null;
 		else
 			return key;
@@ -180,6 +173,10 @@ public class L10N {
 
 	public static JButton button(String key, Object... parameter) {
 		return new JButton(t(key, parameter));
+	}
+
+	public static TechnicalButton technicalbutton(String key, Object... parameter) {
+		return new TechnicalButton(t(key, parameter));
 	}
 
 	public static JRadioButton radiobutton(String key, Object... parameter) {

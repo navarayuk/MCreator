@@ -1,7 +1,7 @@
 <#--
  # MCreator (https://mcreator.net/)
  # Copyright (C) 2012-2020, Pylo
- # Copyright (C) 2020-2022, Pylo, opensource contributors
+ # Copyright (C) 2020-2023, Pylo, opensource contributors
  # 
  # This program is free software: you can redistribute it and/or modify
  # it under the terms of the GNU General Public License as published by
@@ -71,6 +71,7 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 
 	public ${name}Entity(EntityType<${name}Entity> type, Level world) {
     	super(type, world);
+		maxUpStep = ${data.stepHeight}f;
 		xpReward = ${data.xpAmount};
 		setNoAi(${(!data.hasAI)});
 
@@ -165,6 +166,10 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 		super.registerGoals();
 
 		<#if aicode??>
+			<#if aiblocks?seq_contains("doors_open") || aiblocks?seq_contains("doors_close")>
+				this.getNavigation().getNodeEvaluator().setCanOpenDoors(true);
+			</#if>
+
             ${aicode}
         </#if>
 
@@ -187,6 +192,16 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 		return false;
 	}
     </#if>
+
+	<#if data.mobModelName == "Biped">
+	@Override public double getMyRidingOffset() {
+		return -0.35D;
+	}
+	<#elseif data.mobModelName == "Silverfish">
+	@Override public double getMyRidingOffset() {
+		return 0.1D;
+	}
+	</#if>
 
 	<#if data.mountedYOffset != 0>
 	@Override public double getPassengersRidingOffset() {
@@ -246,7 +261,8 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 				"y": "this.getY()",
 				"z": "this.getZ()",
 				"entity": "this",
-				"world": "this.level"
+				"world": "this.level",
+				"damagesource": "source"
 			}/>
 		</#if>
 
@@ -262,72 +278,77 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 		|| data.immuneToCactus || data.immuneToDrowning || data.immuneToLightning || data.immuneToPotions
 		|| data.immuneToPlayer || data.immuneToExplosion || data.immuneToTrident || data.immuneToAnvil
 		|| data.immuneToDragonBreath || data.immuneToWither>
-	@Override public boolean hurt(DamageSource source, float amount) {
+	@Override public boolean hurt(DamageSource damagesource, float amount) {
 		<#if hasProcedure(data.whenMobIsHurt)>
-			<@procedureCode data.whenMobIsHurt, {
-				"x": "this.getX()",
-				"y": "this.getY()",
-				"z": "this.getZ()",
-				"entity": "this",
-				"world": "this.level",
-				"sourceentity": "source.getEntity()"
-			}/>
+			double x = this.getX();
+			double y = this.getY();
+			double z = this.getZ();
+			Level world = this.level;
+			Entity entity = this;
+			Entity sourceentity = damagesource.getEntity();
+			Entity immediatesourceentity = damagesource.getDirectEntity();
+			<#if hasReturnValueOf(data.whenMobIsHurt, "logic")>
+			if (<@procedureOBJToConditionCode data.whenMobIsHurt false true/>)
+				return false;
+			<#else>
+				<@procedureOBJToCode data.whenMobIsHurt/>
+			</#if>
 		</#if>
 		<#if data.immuneToFire>
-			if (source.is(DamageTypes.IN_FIRE))
+			if (damagesource.is(DamageTypes.IN_FIRE))
 				return false;
 		</#if>
 		<#if data.immuneToArrows>
-			if (source.getDirectEntity() instanceof AbstractArrow)
+			if (damagesource.getDirectEntity() instanceof AbstractArrow)
 				return false;
 		</#if>
 		<#if data.immuneToPlayer>
-			if (source.getDirectEntity() instanceof Player)
+			if (damagesource.getDirectEntity() instanceof Player)
 				return false;
 		</#if>
 		<#if data.immuneToPotions>
-			if (source.getDirectEntity() instanceof ThrownPotion || source.getDirectEntity() instanceof AreaEffectCloud)
+			if (damagesource.getDirectEntity() instanceof ThrownPotion || damagesource.getDirectEntity() instanceof AreaEffectCloud)
 				return false;
 		</#if>
 		<#if data.immuneToFallDamage>
-			if (source.is(DamageTypes.FALL))
+			if (damagesource.is(DamageTypes.FALL))
 				return false;
 		</#if>
 		<#if data.immuneToCactus>
-			if (source.is(DamageTypes.CACTUS))
+			if (damagesource.is(DamageTypes.CACTUS))
 				return false;
 		</#if>
 		<#if data.immuneToDrowning>
-			if (source.is(DamageTypes.DROWN))
+			if (damagesource.is(DamageTypes.DROWN))
 				return false;
 		</#if>
 		<#if data.immuneToLightning>
-			if (source.is(DamageTypes.LIGHTNING_BOLT))
+			if (damagesource.is(DamageTypes.LIGHTNING_BOLT))
 				return false;
 		</#if>
 		<#if data.immuneToExplosion>
-			if (source.is(DamageTypes.EXPLOSION))
+			if (damagesource.is(DamageTypes.EXPLOSION))
 				return false;
 		</#if>
 		<#if data.immuneToTrident>
-			if (source.is(DamageTypes.TRIDENT))
+			if (damagesource.is(DamageTypes.TRIDENT))
 				return false;
 		</#if>
 		<#if data.immuneToAnvil>
-			if (source.is(DamageTypes.FALLING_ANVIL))
+			if (damagesource.is(DamageTypes.FALLING_ANVIL))
 				return false;
 		</#if>
 		<#if data.immuneToDragonBreath>
-			if (source.is(DamageTypes.DRAGON_BREATH))
+			if (damagesource.is(DamageTypes.DRAGON_BREATH))
 				return false;
 		</#if>
 		<#if data.immuneToWither>
-			if (source.is(DamageTypes.WITHER))
+			if (damagesource.is(DamageTypes.WITHER))
 				return false;
-			if (source.is(DamageTypes.WITHER_SKULL))
+			if (damagesource.is(DamageTypes.WITHER_SKULL))
 				return false;
 		</#if>
-		return super.hurt(source, amount);
+		return super.hurt(damagesource, amount);
 	}
     </#if>
 
@@ -339,8 +360,10 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 			"y": "this.getY()",
 			"z": "this.getZ()",
 			"sourceentity": "source.getEntity()",
+			"immediatesourceentity": "source.getDirectEntity()",
 			"entity": "this",
-			"world": "this.level"
+			"world": "this.level",
+			"damagesource": "source"
 		}/>
 	}
     </#if>
@@ -509,7 +532,9 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 			"z": "this.getZ()",
 			"entity": "entity",
 			"sourceentity": "this",
-			"world": "this.level"
+			"immediatesourceentity": "damageSource.getDirectEntity()",
+			"world": "this.level",
+			"damagesource": "damageSource"
 		}/>
 	}
     </#if>
@@ -649,7 +674,6 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 				this.setRot(this.getYRot(), this.getXRot());
 				this.yBodyRot = entity.getYRot();
 				this.yHeadRot = entity.getYRot();
-				this.maxUpStep = 1.0F;
 
 				if (entity instanceof LivingEntity passenger) {
 					this.setSpeed((float) this.getAttributeValue(Attributes.MOVEMENT_SPEED));
@@ -678,7 +702,6 @@ public class ${name}Entity extends ${extendsClass} <#if data.ranged>implements R
 				this.calculateEntityAnimation(true);
 				return;
 			}
-			this.maxUpStep = 0.5F;
 			</#if>
 
 			super.travel(dir);

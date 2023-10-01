@@ -91,7 +91,7 @@ public class WorkspaceGeneratorSetupDialog {
 			} else {
 				finalizeTheSetup(m, dial);
 			}
-		});
+		}, "GeneratorSetup");
 		t.start();
 
 		if (showWebsite)
@@ -112,7 +112,12 @@ public class WorkspaceGeneratorSetupDialog {
 				ProgressDialog.ProgressUnit p4 = new ProgressDialog.ProgressUnit(
 						L10N.t("dialog.setup_workspace.step.generating_base"));
 				dial.addProgress(p4);
-				m.getGenerator().generateBase();
+				try {
+					m.getGenerator().generateBase();
+				} catch (Exception e) {
+					// We catch any potential exceptions here to make sure generator setup does not fail due to base generation failure
+					LOG.error("Failed to generate base", e);
+				}
 				p4.ok();
 
 				WorkspaceGeneratorSetup.completeSetup(m.getGenerator());
@@ -126,7 +131,7 @@ public class WorkspaceGeneratorSetupDialog {
 				showSetupFailedMessage(dial, m,
 						L10N.t("dialog.setup_workspace.step.failed_build_caches") + e.getMessage());
 			}
-		}).start();
+		}, "GeneratorSetupFinalizer").start();
 	}
 
 	private static void showSetupFailedMessage(ProgressDialog dial, MCreator m, String s) {

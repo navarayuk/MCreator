@@ -19,7 +19,7 @@
 
 package net.mcreator.ui.minecraft.villagers;
 
-import net.mcreator.element.parts.VillagerProfession;
+import net.mcreator.element.parts.ProfessionEntry;
 import net.mcreator.element.types.VillagerTrade;
 import net.mcreator.minecraft.ElementUtil;
 import net.mcreator.ui.MCreator;
@@ -29,7 +29,7 @@ import net.mcreator.ui.help.IHelpContext;
 import net.mcreator.ui.init.L10N;
 import net.mcreator.ui.init.UIRES;
 import net.mcreator.ui.minecraft.DataListComboBox;
-import net.mcreator.ui.minecraft.JEntriesList;
+import net.mcreator.ui.component.entries.JEntriesList;
 import net.mcreator.workspace.Workspace;
 
 import javax.swing.*;
@@ -41,8 +41,7 @@ import java.util.stream.Collectors;
 
 public class JVillagerTradeProfession extends JEntriesList {
 
-	private final DataListComboBox villagerProfession = new DataListComboBox(mcreator,
-			ElementUtil.loadAllVillagerProfessions());
+	private final DataListComboBox villagerProfession;
 
 	private final List<JVillagerTradeEntry> entryList = new ArrayList<>();
 
@@ -54,11 +53,12 @@ public class JVillagerTradeProfession extends JEntriesList {
 			List<JVillagerTradeProfession> professionList) {
 		super(mcreator, new BorderLayout(), gui);
 
+		this.workspace = mcreator.getWorkspace();
+
 		setOpaque(false);
 
+		villagerProfession = new DataListComboBox(mcreator, ElementUtil.loadAllVillagerProfessions(workspace));
 		villagerProfession.setRenderer(new JComboBox<>().getRenderer());
-
-		this.workspace = mcreator.getWorkspace();
 
 		final JComponent container = PanelUtils.expandHorizontally(this);
 
@@ -109,8 +109,8 @@ public class JVillagerTradeProfession extends JEntriesList {
 		parent.repaint();
 	}
 
-	public void reloadDataLists() {
-		ComboBoxUtil.updateComboBoxContents(villagerProfession, ElementUtil.loadAllVillagerProfessions());
+	@Override public void reloadDataLists() {
+		ComboBoxUtil.updateComboBoxContents(villagerProfession, ElementUtil.loadAllVillagerProfessions(workspace));
 	}
 
 	public void addInitialEntry() {
@@ -119,7 +119,7 @@ public class JVillagerTradeProfession extends JEntriesList {
 
 	public VillagerTrade.CustomTradeEntry getTradeEntry() {
 		VillagerTrade.CustomTradeEntry entry = new VillagerTrade.CustomTradeEntry();
-		entry.villagerProfession = new VillagerProfession(workspace, villagerProfession.getSelectedItem());
+		entry.villagerProfession = new ProfessionEntry(workspace, villagerProfession.getSelectedItem());
 		entry.entries = entryList.stream().map(JVillagerTradeEntry::getEntry).filter(Objects::nonNull)
 				.collect(Collectors.toList());
 		if (entry.entries.isEmpty())

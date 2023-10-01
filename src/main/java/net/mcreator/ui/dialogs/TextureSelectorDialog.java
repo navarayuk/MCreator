@@ -23,7 +23,6 @@ import net.mcreator.ui.component.util.ComponentUtils;
 import net.mcreator.ui.component.util.PanelUtils;
 import net.mcreator.ui.init.ImageMakerTexturesCache;
 import net.mcreator.ui.init.L10N;
-import net.mcreator.ui.init.UIRES;
 import net.mcreator.util.image.ImageUtils;
 
 import javax.swing.*;
@@ -46,7 +45,7 @@ public class TextureSelectorDialog extends MCreatorDialog {
 
 	public TextureSelectorDialog(Iterable<ResourcePointer> block, JFrame f) {
 		super(f, L10N.t("dialog.textures_selector.title_window"), true);
-		setIconImage(UIRES.getBuiltIn("icon").getImage());
+
 		list.setCellRenderer(new Render());
 
 		list.setLayoutOrientation(JList.HORIZONTAL_WRAP);

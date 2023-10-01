@@ -20,17 +20,10 @@ package net.mcreator.ui.action;
 
 import net.mcreator.ui.MCreator;
 import net.mcreator.ui.MCreatorApplication;
-import net.mcreator.ui.action.impl.AboutAction;
-import net.mcreator.ui.action.impl.CheckForUpdatesAction;
-import net.mcreator.ui.action.impl.MinecraftFolderActions;
-import net.mcreator.ui.action.impl.ShowDataListAction;
+import net.mcreator.ui.action.impl.*;
 import net.mcreator.ui.action.impl.gradle.*;
-import net.mcreator.ui.action.impl.vcs.*;
 import net.mcreator.ui.action.impl.workspace.*;
-import net.mcreator.ui.action.impl.workspace.resources.ImportSoundAction;
-import net.mcreator.ui.action.impl.workspace.resources.ModelImportActions;
-import net.mcreator.ui.action.impl.workspace.resources.StructureImportActions;
-import net.mcreator.ui.action.impl.workspace.resources.TextureAction;
+import net.mcreator.ui.action.impl.workspace.resources.*;
 import net.mcreator.ui.browser.action.*;
 import net.mcreator.ui.dialogs.TextureImportDialogs;
 import net.mcreator.ui.dialogs.imageeditor.NewImageDialog;
@@ -79,6 +72,7 @@ public class ActionRegistry {
 	// Help actions
 	public final BasicAction aboutMCreator;
 	public final BasicAction checkForUpdates;
+	public final BasicAction checkForPluginUpdates;
 	public final BasicAction showShortcuts;
 	public final BasicAction help;
 	public final BasicAction support;
@@ -140,15 +134,6 @@ public class ActionRegistry {
 	public final BasicAction importJavaModel;
 	public final BasicAction importJSONModel;
 	public final BasicAction importOBJModel;
-
-	// VCS actions
-	public final BasicAction setupVCS;
-	public final BasicAction unlinkVCS;
-	public final BasicAction setupVCSOrSettings;
-	public final BasicAction syncToRemote;
-	public final BasicAction syncFromRemote;
-	public final BasicAction showUnsyncedChanges;
-	public final BasicAction remoteWorkspaceSettings;
 
 	// Window actions
 	public final BasicAction showWorkspaceBrowser;
@@ -215,6 +200,7 @@ public class ActionRegistry {
 				e -> mcreator.getApplication().closeApplication());
 		this.aboutMCreator = new AboutAction(this);
 		this.checkForUpdates = new CheckForUpdatesAction(this);
+		this.checkForPluginUpdates = new CheckForPluginUpdatesAction(this);
 		this.help = new VisitURIAction(this, L10N.t("action.wiki"), MCreatorApplication.SERVER_DOMAIN + "/wiki");
 		this.support = new VisitURIAction(this, L10N.t("action.support"),
 				MCreatorApplication.SERVER_DOMAIN + "/support");
@@ -246,35 +232,29 @@ public class ActionRegistry {
 			newImageDialog.setVisible(true);
 		}).setIcon(UIRES.get("16px.newtexture"));
 		this.createArmorTexture = new TextureAction(this, L10N.t("action.create_armor_texture"),
-				actionEvent -> new ArmorImageMakerView(mcreator).showView()).setIcon(UIRES.get("16px.newarmor"));
+				actionEvent -> new ArmorImageMakerView(mcreator).showView(), TextureType.ARMOR).setIcon(
+				UIRES.get("16px.newarmor"));
 		this.createAnimatedTexture = new TextureAction(this, L10N.t("action.create_animated_texture"),
 				actionEvent -> new AnimationMakerView(mcreator).showView()).setIcon(UIRES.get("16px.newanimation"));
-		this.importBlockTexture = new TextureAction(this, L10N.t("action.import_block_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.BLOCK)).setIcon(
-				UIRES.get("16px.importblock"));
-		this.importItemTexture = new TextureAction(this, L10N.t("action.import_item_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.ITEM)).setIcon(
-				UIRES.get("16px.importitem"));
-		this.importEntityTexture = new TextureAction(this, L10N.t("action.import_entity_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.ENTITY)).setIcon(
-				UIRES.get("16px.importentity"));
-		this.importEffectTexture = new TextureAction(this, L10N.t("action.import_effect_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.EFFECT)).setIcon(
-				UIRES.get("16px.importeffect"));
-		this.importParticleTexture = new TextureAction(this, L10N.t("action.import_particle_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.PARTICLE)).setIcon(
-				UIRES.get("16px.importparticle"));
-		this.importScreenTexture = new TextureAction(this, L10N.t("action.import_screen_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.SCREEN)).setIcon(
-				UIRES.get("16px.importgui"));
+		this.importBlockTexture = new TextureImportAction(this, L10N.t("action.import_block_texture"),
+				TextureType.BLOCK).setIcon(UIRES.get("16px.importblock"));
+		this.importItemTexture = new TextureImportAction(this, L10N.t("action.import_item_texture"),
+				TextureType.ITEM).setIcon(UIRES.get("16px.importitem"));
+		this.importEntityTexture = new TextureImportAction(this, L10N.t("action.import_entity_texture"),
+				TextureType.ENTITY).setIcon(UIRES.get("16px.importentity"));
+		this.importEffectTexture = new TextureImportAction(this, L10N.t("action.import_effect_texture"),
+				TextureType.EFFECT).setIcon(UIRES.get("16px.importeffect"));
+		this.importParticleTexture = new TextureImportAction(this, L10N.t("action.import_particle_texture"),
+				TextureType.PARTICLE).setIcon(UIRES.get("16px.importparticle"));
+		this.importScreenTexture = new TextureImportAction(this, L10N.t("action.import_screen_texture"),
+				TextureType.SCREEN).setIcon(UIRES.get("16px.importgui"));
 		this.importArmorTexture = new TextureAction(this, L10N.t("action.import_armor_texture"), actionEvent -> {
 			TextureImportDialogs.importArmor(mcreator);
 			mcreator.mv.resourcesPan.workspacePanelTextures.reloadElements();
-		}).setIcon(UIRES.get("16px.importarmor"));
-		this.importOtherTexture = new TextureAction(this, L10N.t("action.import_other_texture"),
-				actionEvent -> TextureImportDialogs.importMultipleTextures(mcreator, TextureType.OTHER)).setIcon(
-				UIRES.get("16px.importtexture"));
-		this.importSound = new ImportSoundAction(this);
+		}, TextureType.ARMOR).setIcon(UIRES.get("16px.importarmor"));
+		this.importOtherTexture = new TextureImportAction(this, L10N.t("action.import_other_texture"),
+				TextureType.OTHER).setIcon(UIRES.get("16px.importtexture"));
+		this.importSound = new SoundImportAction(this);
 		this.importStructure = new StructureImportActions.ImportStructure(this).setIcon(
 				UIRES.get("16px.importstructure"));
 		this.importStructureFromMinecraft = new StructureImportActions.ImportStructureFromMinecraft(this);
@@ -303,13 +283,6 @@ public class ActionRegistry {
 		this.importWorkspace = new ImportWorkspaceAction(this);
 		this.openWorkspaceFolder = new BasicAction(this, L10N.t("action.open_workspace_folder"),
 				e -> DesktopUtils.openSafe(mcreator.getWorkspaceFolder()));
-		this.setupVCS = new SetupVCSAction(this);
-		this.unlinkVCS = new UnlinkVCSAction(this);
-		this.setupVCSOrSettings = new SetupOrSettingsVCSAction(this);
-		this.syncToRemote = new SyncLocalWithRemoteAction(this);
-		this.syncFromRemote = new SyncRemoteToLocalAction(this);
-		this.showUnsyncedChanges = new ShowLocalChangesAction(this);
-		this.remoteWorkspaceSettings = new VCSInfoSettingsAction(this);
 		this.openMaterialPackMaker = MaterialPackMakerTool.getAction(this);
 		this.openOrePackMaker = OrePackMakerTool.getAction(this);
 		this.openToolPackMaker = ToolPackMakerTool.getAction(this);
